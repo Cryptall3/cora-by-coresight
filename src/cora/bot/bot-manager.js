@@ -248,16 +248,21 @@ Define Cora's rules of engagement. These settings apply to all autonomous trades
     });
 
     this.bot.action(/^send_prompt_(.+)$/, async (ctx) => {
+      console.log(`[BOT] Send SOL clicked by ${ctx.from.id}`);
       const walletId = ctx.match[1];
       this.userStates.set(ctx.from.id, { action: 'await_send_address', walletId });
       ctx.reply('📤 **Send SOL**\n\nPlease paste the destination Solana address:', { parse_mode: 'Markdown' });
     });
+
+    this.bot.action(/^rename_prompt_(.+)$/, async (ctx) => {
+      console.log(`[BOT] Rename Wallet clicked by ${ctx.from.id}`);
       const walletId = ctx.match[1];
       this.userStates.set(ctx.from.id, { action: 'await_rename', walletId });
       ctx.reply('🏷️ **Rename Wallet**\n\nPlease type the new name for this wallet:', { parse_mode: 'Markdown' });
     });
 
     this.bot.action('alpha_sniper', async (ctx) => {
+      console.log(`[BOT] Alpha Sniper Hub clicked by ${ctx.from.id}`);
       try {
         const profile = await userService.getProfile(ctx.from.id);
         if (!profile || !profile.wallets || profile.wallets.length === 0) {
