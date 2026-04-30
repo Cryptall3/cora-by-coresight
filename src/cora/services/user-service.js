@@ -21,11 +21,22 @@ export class UserService {
 
       // 1. Check if user already exists in Cora DB
       const existingUser = await collection.findOne({ userId });
-      if (existingUser) return existingUser;
+      
+      // Check if wallet exists in local keystore
+      let walletExists = false;
+      try {
+        if (existingUser) {
+          keystore.getWallet(existingUser.walletName);
+          walletExists = true;
+        }
+      } catch (e) {
+        walletExists = false;
+      }
+
+      if (existingUser && walletExists) return existingUser;
 
       // 2. Generate a secure passphrase for the Zerion wallet
-      // We use the Telegram userId + a server secret to ensure it's unique and reproducible if needed
-      const serverSecret = process.env.ZERION_API_KEY || 'default_secret'; // Fallback for dev
+      const serverSecret = process.env.ZERION_API_KEY || 'default_secret';
       const walletName = `cora-${userId}`;
       const passphrase = crypto.createHmac('sha256', serverSecret).update(userId.toString()).digest('hex');
 
@@ -64,7 +75,11 @@ export class UserService {
         createdAt: new Date()
       };
 
-      await collection.insertOne(profile);
+      await collection.updateOne(
+        { userId },
+        { $set: profile },
+        { upsert: true }
+      );
       console.log(`✅ [USER SERVICE] Created profile for user ${userId} with wallet ${wallet.solAddress}`);
       
       return profile;
