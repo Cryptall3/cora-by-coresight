@@ -1,0 +1,73 @@
+{
+  "name": "zerion-cli",
+  "version": "1.0.0",
+  "description": "Zerion for AI agents and developers: wallet-analysis skill bundle and a JSON-first CLI.",
+  "author": "Zerion",
+  "type": "module",
+  "bin": {
+    "zerion": "./cli/zerion.js"
+  },
+  "files": [
+    "cli/zerion.js",
+    "cli/router.js",
+    "cli/commands/",
+    "cli/utils/",
+    "cli/policies/",
+    "skills/",
+    "plugins/",
+    ".agents/",
+    ".claude-plugin/",
+    ".codex-plugin/",
+    "gemini-extension.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test 'cli/tests/unit/**/*.test.mjs'",
+    "test:unit": "node --test 'cli/tests/unit/**/*.test.mjs'",
+    "test:integration": "node --test --test-concurrency=1 'cli/tests/integration/**/*.test.mjs'",
+    "test:integration:auth": "node --test cli/tests/integration/auth.test.mjs",
+    "test:all": "node --test 'cli/tests/**/*.test.mjs'",
+    "prepublishOnly": "npm test",
+    "start": "node src/cora/index.js"
+  },
+  "imports": {
+    "#zerion/*": "./cli/*",
+    "#zerion": "./package.json"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "zerion",
+    "ai",
+    "wallet",
+    "openclaw",
+    "cli"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zeriontech/zerion-ai.git"
+  },
+  "bugs": {
+    "url": "https://github.com/zeriontech/zerion-ai/issues"
+  },
+  "homepage": "https://github.com/zeriontech/zerion-ai#readme",
+  "license": "MIT",
+  "dependencies": {
+    "@open-wallet-standard/core": "^1.2.4",
+    "@solana/web3.js": "^1.98.4",
+    "@x402/evm": "^2.6.0",
+    "@x402/fetch": "^2.6.0",
+    "@x402/svm": "^2.8.0",
+    "dotenv": "^17.4.2",
+    "mongodb": "^7.2.0",
+    "mppx": "^0.6.2",
+    "qrcode-terminal": "^0.12.0",
+    "telegraf": "^4.16.3",
+    "viem": "^2.0.0"
+  },
+  "overrides": {
+    "uuid": "^14.0.0"
+  }
+}
