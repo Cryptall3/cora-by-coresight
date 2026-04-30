@@ -15,6 +15,11 @@ export class BotManager {
     this.setupHandlers();
   }
 
+  async start() {
+    console.log('🚀 [BOT] Cora Telegram Bot initialized.');
+    return true;
+  }
+
   setupHandlers() {
     // /start command
     this.bot.start(async (ctx) => {
