@@ -43,7 +43,7 @@ export class BotManager {
       ctx.editMessageText(walletMsg, {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
-          [Markup.button.callback('🔑 Export Private Key', 'export_key')],
+          [Markup.button.callback('🔑 Export Seed Phrase', 'export_key')],
           [Markup.button.callback('⬅️ Back', 'main_menu')]
         ])
       });
@@ -52,14 +52,22 @@ export class BotManager {
     this.bot.action('export_key', async (ctx) => {
       try {
         const mnemonic = await userService.exportPrivateKey(ctx.from.id);
+        
+        // Using <tg-spoiler> for the blur effect (requires HTML parse_mode)
         const msg = await ctx.reply(`
 ⚠️ **RECOVERY PHRASE EXPORT** ⚠️
 
-**Your 12-word Seed Phrase:**
-\`${mnemonic}\`
+<b>Your 12-word Seed Phrase:</b>
+<tg-spoiler>${mnemonic}</tg-spoiler>
 
-*DO NOT share this phrase with anyone. Use it to import your wallet into Phantom or Backpack. This message will self-destruct in 60 seconds.*
-        `, { parse_mode: 'Markdown' });
+<i>(Tap the blurred box above to reveal)</i>
+
+DO NOT share this phrase with anyone. Use it to export your wallet.
+This message will self-destruct in 60 seconds.
+<b>Be careful not to expose this phrase.</b>
+
+<i>Note: CORESIGHT does not store your seedphrase, so it is perfectly safe.</i>
+        `, { parse_mode: 'HTML' });
 
         // Auto-delete after 60 seconds
         setTimeout(() => {
