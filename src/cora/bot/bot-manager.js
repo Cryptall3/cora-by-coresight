@@ -17,46 +17,9 @@ export class BotManager {
   setupHandlers() {
     // /start command
     this.bot.start(async (ctx) => {
-      const userId = ctx.from.id;
-      const userName = ctx.from.first_name || 'Trader';
-
       try {
         ctx.reply(`🔍 Checking your Coresight Alpha access...`);
-
-        // 1. Check Subscription in the main database
-        const access = await subService.checkAccess(userId);
-
-        if (!access.hasAccess) {
-          return ctx.reply(
-            `❌ **Access Denied**\n\nCora is an exclusive autonomous agent for Coresight Alpha members.\n\nPlease upgrade your plan to activate your personal trading agent.`,
-            Markup.inlineKeyboard([
-              [Markup.button.url('💎 Upgrade to Alpha', 'https://coresight.xyz/subscription')]
-            ])
-          );
-        }
-
-        // 2. Initialize or fetch user profile (Generates Zerion wallet if new)
-        const profile = await userService.createUserProfile(userId);
-
-        // 3. Welcome Message
-        const welcomeMsg = `
-🤖 **Welcome to Cora, ${userName}!**
-
-I am your personal autonomous trading agent, connected to the Coresight Alpha detection system.
-
-💳 **Your Personal Trading Wallet:**
-\`${profile.solAddress}\` (Solana)
-
-*Status:* ${profile.settings.snipeEnabled ? '🟢 ACTIVE' : '🔴 PAUSED'}
-
-Use the menu below to fund your wallet, configure your tactics, and start sniping.
-        `;
-
-        return ctx.reply(welcomeMsg, {
-          parse_mode: 'Markdown',
-          ...this.getMainMenu()
-        });
-
+        await this.sendDashboard(ctx, false);
       } catch (error) {
         console.error('❌ [BOT] Error in /start:', error);
         ctx.reply('⚠️ An error occurred during onboarding. Please try again later.');
@@ -65,10 +28,7 @@ Use the menu below to fund your wallet, configure your tactics, and start snipin
 
     // Handle Menu Actions
     this.bot.action('main_menu', (ctx) => {
-      ctx.editMessageText('🤖 **Cora Main Menu**', {
-        parse_mode: 'Markdown',
-        ...this.getMainMenu()
-      });
+      this.sendDashboard(ctx, true);
     });
 
     this.bot.action('wallet_settings', async (ctx) => {
@@ -114,6 +74,50 @@ Use the menu below to fund your wallet, configure your tactics, and start snipin
     // Start polling
     this.bot.launch();
     console.log('🚀 [BOT] Cora Telegram Bot is online.');
+  }
+
+  async sendDashboard(ctx, isEdit = false) {
+    const userId = ctx.from.id;
+    const userName = ctx.from.first_name || 'Trader';
+
+    // 1. Check Subscription
+    const access = await subService.checkAccess(userId);
+
+    if (!access.hasAccess) {
+      const msg = `❌ **Access Denied**\n\nCora is an exclusive autonomous agent for Coresight Alpha members.\n\nPlease upgrade your plan to activate your personal trading agent.`;
+      const kb = Markup.inlineKeyboard([
+        [Markup.button.url('💎 Upgrade to Alpha', 'https://coresight.xyz/subscription')]
+      ]);
+      return isEdit ? ctx.editMessageText(msg, { parse_mode: 'Markdown', ...kb }) : ctx.reply(msg, { parse_mode: 'Markdown', ...kb });
+    }
+
+    // 2. Get Profile
+    const profile = await userService.createUserProfile(userId);
+
+    // 3. Build Dashboard
+    const welcomeMsg = `
+🤖 **Welcome to Cora, ${userName}!**
+
+I am your personal autonomous trading agent, connected to the Coresight Alpha detection system.
+
+💳 **Your Personal Trading Wallet:**
+\`${profile.solAddress}\` (Solana)
+
+*Status:* ${profile.settings.snipeEnabled ? '🟢 ACTIVE' : '🔴 PAUSED'}
+
+Use the menu below to fund your wallet, configure your tactics, and start sniping.
+    `;
+
+    const extra = {
+      parse_mode: 'Markdown',
+      ...this.getMainMenu()
+    };
+
+    if (isEdit) {
+      return ctx.editMessageText(welcomeMsg, extra);
+    } else {
+      return ctx.reply(welcomeMsg, extra);
+    }
   }
 
   getMainMenu() {
