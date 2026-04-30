@@ -14,7 +14,12 @@ async function startCora() {
 
   // 0. HTTP server for Koyeb health checks AND Telegram Webhooks
   const port = process.env.PORT || 8000;
-  const webhookUrl = process.env.KOYEB_PUBLIC_URL || `https://${process.env.KOYEB_APP_NAME}.koyeb.app`;
+  
+  // Clean the Webhook URL (Ensure it has https:// and no trailing slash)
+  let webhookUrl = process.env.KOYEB_PUBLIC_URL || `https://${process.env.KOYEB_APP_NAME}.koyeb.app`;
+  if (!webhookUrl.startsWith('http')) webhookUrl = `https://${webhookUrl}`;
+  webhookUrl = webhookUrl.replace(/\/$/, ''); // Remove trailing slash if any
+
   const webhookPath = `/telegraf/${process.env.TELEGRAM_BOT_TOKEN}`;
 
   const server = http.createServer((req, res) => {
