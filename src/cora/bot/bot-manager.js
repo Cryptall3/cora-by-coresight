@@ -252,22 +252,25 @@ Define Cora's rules of engagement. These settings apply to all autonomous trades
       this.userStates.set(ctx.from.id, { action: 'await_send_address', walletId });
       ctx.reply('📤 **Send SOL**\n\nPlease paste the destination Solana address:', { parse_mode: 'Markdown' });
     });
-
-    this.bot.action(/^rename_prompt_(.+)$/, async (ctx) => {
       const walletId = ctx.match[1];
       this.userStates.set(ctx.from.id, { action: 'await_rename', walletId });
       ctx.reply('🏷️ **Rename Wallet**\n\nPlease type the new name for this wallet:', { parse_mode: 'Markdown' });
     });
 
     this.bot.action('alpha_sniper', async (ctx) => {
-      const profile = await userService.getProfile(ctx.from.id);
-      const activeWallet = profile.wallets[0]; // Sniping uses primary wallet
-      const settings = profile.settings;
+      try {
+        const profile = await userService.getProfile(ctx.from.id);
+        if (!profile || !profile.wallets || profile.wallets.length === 0) {
+          return ctx.answerCbQuery('⚠️ No wallets found. Please create one first.', { show_alert: true });
+        }
 
-      const statusEmoji = settings.snipeEnabled ? '🟢 RUNNING' : '🔴 PAUSED';
-      const toggleLabel = settings.snipeEnabled ? '⏹️ Stop Sniper' : '🚀 Start Sniper';
+        const activeWallet = profile.wallets[0]; // Sniping uses primary wallet
+        const settings = profile.settings || {};
 
-      const msg = `
+        const statusEmoji = settings.snipeEnabled ? '🟢 RUNNING' : '🔴 PAUSED';
+        const toggleLabel = settings.snipeEnabled ? '⏹️ Stop Sniper' : '🚀 Start Sniper';
+
+        const msg = `
 🎯 **Alpha Sniper Configuration**
 
 You are about to connect Cora to the **Coresight Alpha** detection system. 
@@ -275,23 +278,27 @@ You are about to connect Cora to the **Coresight Alpha** detection system.
 ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.** Any new signals will be executed immediately.' : 'Cora will monitor all Alpha signals and execute trades based on these metrics:'}
 
 💳 **Wallet:** \`${activeWallet.solAddress}\`
-💰 **Buy Amount:** \`${settings.defaultBuyAmount} SOL\`
-📈 **Take Profit:** \`+${settings.tpPercent}%\`
-📉 **Stop Loss:** \`-${settings.slPercent}%\`
-🌊 **Slippage:** \`${settings.slippage}%\`
+💰 **Buy Amount:** \`${settings.defaultBuyAmount || 0.1} SOL\`
+📈 **Take Profit:** \`+${settings.tpPercent || 100}%\`
+📉 **Stop Loss:** \`-${settings.slPercent || 50}%\`
+🌊 **Slippage:** \`${settings.slippage || 1.0}%\`
 🔄 **Auto-Exit:** \`${settings.autoExit ? 'ENABLED' : 'DISABLED'}\`
 
 *Status:* **${statusEmoji}**
-      `;
+        `;
 
-      ctx.editMessageText(msg, {
-        parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard([
-          [Markup.button.callback(toggleLabel, 'toggle_sniper')],
-          [Markup.button.callback('⚙️ Modify Tactics', 'tactics_settings')],
-          [Markup.button.callback('⬅️ Back to Hub', 'back_to_dashboard')]
-        ])
-      });
+        await ctx.editMessageText(msg, {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback(toggleLabel, 'toggle_sniper')],
+            [Markup.button.callback('⚙️ Modify Tactics', 'tactics_settings')],
+            [Markup.button.callback('⬅️ Back to Hub', 'back_to_dashboard')]
+          ])
+        });
+      } catch (err) {
+        console.error('❌ [BOT] Alpha Sniper Error:', err);
+        ctx.answerCbQuery('⚠️ Could not load sniper settings. Try again.', { show_alert: true });
+      }
     });
 
     this.bot.action('toggle_sniper', async (ctx) => {
