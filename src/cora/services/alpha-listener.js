@@ -1,0 +1,108 @@
+import { connectToDatabase } from '../db.js';
+import { UserService } from './user-service.js';
+import { TradeExecutor } from './trade-executor.js';
+
+const userService = new UserService();
+const tradeExecutor = new TradeExecutor();
+
+export class AlphaListener {
+  constructor() {
+    this.isRunning = false;
+    this.db = null;
+    this.coraDb = null;
+    this.changeStream = null;
+  }
+
+  async start() {
+    if (this.isRunning) return;
+    
+    try {
+      console.log('📡 [ALPHA LISTENER] Connecting to signal stream...');
+      
+      // 1. Connect to both databases
+      this.coraDb = await connectToDatabase(); // cora-bot (settings)
+      this.db = await connectToDatabase('coresight-bot'); // coresight-bot (signals)
+      
+      const signalCollection = this.db.collection('alpha_tokens');
+      const profileCollection = this.coraDb.collection('user_profiles');
+
+      this.isRunning = true;
+      console.log('✅ [ALPHA LISTENER] Watching alpha_tokens for new signals...');
+
+      // 2. Use Change Stream for real-time detection (Requires Replica Set)
+      this.changeStream = signalCollection.watch([
+        { $match: { operationType: 'insert' } }
+      ]);
+
+      this.changeStream.on('change', async (change) => {
+        const token = change.fullDocument;
+        console.log(`🎯 [SIGNAL] New Alpha Detected: ${token.symbol} (${token.mint})`);
+
+        // 3. Find all users with sniping enabled
+        const activeSnipers = await profileCollection.find({
+          'settings.snipeEnabled': true
+        }).toArray();
+
+        if (activeSnipers.length === 0) {
+          console.log(`ℹ️ [SIGNAL] No active snipers found for ${token.symbol}. Skipping.`);
+          return;
+        }
+
+        console.log(`🚀 [SNIPE] Executing trades for ${activeSnipers.length} users on ${token.symbol}...`);
+
+        // 4. Trigger trade for each user
+        for (const user of activeSnipers) {
+          this.executeSnipe(user, token);
+        }
+      });
+
+      // Fallback for environments without Change Streams (Polling)
+      this.changeStream.on('error', (err) => {
+        console.warn('⚠️ [ALPHA LISTENER] Change Stream failed. Falling back to polling...', err.message);
+        this.startPolling(signalCollection, profileCollection);
+      });
+
+    } catch (error) {
+      console.error('❌ [ALPHA LISTENER] Start error:', error);
+    }
+  }
+
+  async startPolling(signalCollection, profileCollection) {
+    let lastSeenId = null;
+
+    setInterval(async () => {
+      try {
+        const query = lastSeenId ? { _id: { $gt: lastSeenId } } : {};
+        const newTokens = await signalCollection.find(query).sort({ _id: 1 }).toArray();
+
+        for (const token of newTokens) {
+          lastSeenId = token._id;
+          console.log(`🎯 [SIGNAL-POLL] New Alpha Detected: ${token.symbol}`);
+          
+          const activeSnipers = await profileCollection.find({ 'settings.snipeEnabled': true }).toArray();
+          for (const user of activeSnipers) {
+            this.executeSnipe(user, token);
+          }
+        }
+      } catch (err) {
+        console.error('❌ [POLLING] Error:', err);
+      }
+    }, 5000); // Poll every 5 seconds
+  }
+
+  async executeSnipe(user, token) {
+    try {
+      console.log(`🔫 [SNIPE-EXEC] User ${user.userId} is sniping ${token.symbol}...`);
+      
+      const result = await tradeExecutor.executeSnipe(user, token);
+      
+      if (result.success) {
+        console.log(`💰 [SNIPE-SUCCESS] User ${user.userId} bought ${token.symbol}! Hash: ${result.hash}`);
+      } else {
+        console.error(`⚠️ [SNIPE-FAIL] User ${user.userId} failed: ${result.error}`);
+      }
+    } catch (error) {
+      console.error(`❌ [SNIPE-EXEC] Critical Error for user ${user.userId}:`, error);
+    }
+  }
+}

@@ -1,18 +1,24 @@
 import { BotManager } from './bot/bot-manager.js';
-import { AlphaListener } from './listeners/alpha-listener.js';
+import { AlphaListener } from './services/alpha-listener.js';
 import http from 'http';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
+const botManager = new BotManager();
+const alphaListener = new AlphaListener();
+
 async function startCora() {
   console.log('🤖 Starting Cora Agent Service...');
 
   // 1. Start the Telegram Bot Interface
-  const botManager = new BotManager();
+  await botManager.start();
   const bot = botManager.bot;
+    
+  // 2. Start the Alpha Signal Listener (Ears)
+  await alphaListener.start();
 
-  // 0. HTTP server for Koyeb health checks AND Telegram Webhooks
+  // 3. HTTP server for Koyeb health checks AND Telegram Webhooks
   const port = process.env.PORT || 8000;
   
   // Clean the Webhook URL (Ensure it has https:// and no trailing slash)
@@ -42,10 +48,6 @@ async function startCora() {
       console.error('❌ [WEBHOOK] Failed to set webhook:', err);
     }
   });
-
-  // 2. Start the Signal Listener (Ears)
-  const alphaListener = new AlphaListener();
-  await alphaListener.start();
 
   console.log('✅ Cora is fully operational and listening for signals.');
 

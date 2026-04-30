@@ -254,6 +254,52 @@ Define Cora's rules of engagement. These settings apply to all autonomous trades
       ctx.reply('🏷️ **Rename Wallet**\n\nPlease type the new name for this wallet:', { parse_mode: 'Markdown' });
     });
 
+    this.bot.action('alpha_sniper', async (ctx) => {
+      const profile = await userService.getProfile(ctx.from.id);
+      const activeWallet = profile.wallets[0]; // Sniping uses primary wallet
+      const settings = profile.settings;
+
+      const statusEmoji = settings.snipeEnabled ? '🟢 RUNNING' : '🔴 PAUSED';
+      const toggleLabel = settings.snipeEnabled ? '⏹️ Stop Sniper' : '🚀 Start Sniper';
+
+      const msg = `
+🎯 **Alpha Sniper Configuration**
+
+You are about to connect Cora to the **Coresight Alpha** detection system. 
+
+${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.** Any new signals will be executed immediately.' : 'Cora will monitor all Alpha signals and execute trades based on these metrics:'}
+
+💳 **Wallet:** \`${activeWallet.solAddress}\`
+💰 **Buy Amount:** \`${settings.defaultBuyAmount} SOL\`
+📈 **Take Profit:** \`+${settings.tpPercent}%\`
+📉 **Stop Loss:** \`-${settings.slPercent}%\`
+🌊 **Slippage:** \`${settings.slippage}%\`
+🔄 **Auto-Exit:** \`${settings.autoExit ? 'ENABLED' : 'DISABLED'}\`
+
+*Status:* **${statusEmoji}**
+      `;
+
+      ctx.editMessageText(msg, {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback(toggleLabel, 'toggle_sniper')],
+          [Markup.button.callback('⚙️ Modify Tactics', 'tactics_settings')],
+          [Markup.button.callback('⬅️ Back to Hub', 'back_to_dashboard')]
+        ])
+      });
+    });
+
+    this.bot.action('toggle_sniper', async (ctx) => {
+      const profile = await userService.getProfile(ctx.from.id);
+      const newState = !profile.settings.snipeEnabled;
+      await userService.updateSettings(ctx.from.id, { ...profile.settings, snipeEnabled: newState });
+
+      ctx.answerCbQuery(`Alpha Sniper ${newState ? 'STARTED 🚀' : 'STOPPED ⏹️'}`);
+      
+      // Re-render the menu to show updated status
+      this.bot.handleUpdate({ ...ctx.update, callback_query: { ...ctx.callbackQuery, data: 'alpha_sniper' } });
+    });
+
     this.bot.action(/^delete_confirm_(.+)$/, async (ctx) => {
       const walletId = ctx.match[1];
       ctx.editMessageText('⚠️ **Confirm Deletion**\n\nAre you absolutely sure you want to delete this wallet? This cannot be undone.', {
