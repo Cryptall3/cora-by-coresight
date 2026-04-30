@@ -19,28 +19,19 @@ export class SubscriptionService {
 
       const now = new Date();
       
-      // Look for an active premium subscription
+      // Look for an active subscription matching the REAL schema
       const subscription = await collection.findOne({
         userId: parseInt(userId),
-        planType: 'premium',
-        status: 'active',
-        expiresAt: { $gt: now }
+        active: true,
+        endDate: { $gt: now }
       });
 
       if (subscription) {
-        return { hasAccess: true, plan: 'premium' };
-      }
-
-      // Check for basic if premium is not found
-      const basicSub = await collection.findOne({
-        userId: parseInt(userId),
-        planType: 'basic',
-        status: 'active',
-        expiresAt: { $gt: now }
-      });
-
-      if (basicSub) {
-        return { hasAccess: true, plan: 'basic' };
+        console.log(`✅ [SUBSCRIPTION] Access granted for user ${userId} (${subscription.planType})`);
+        return { 
+          hasAccess: true, 
+          plan: subscription.planType 
+        };
       }
 
       return { hasAccess: false, plan: null };
