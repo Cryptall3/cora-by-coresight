@@ -297,7 +297,7 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.** Any new signals
           ...Markup.inlineKeyboard([
             [Markup.button.callback(toggleLabel, 'toggle_sniper')],
             [Markup.button.callback('⚙️ Modify Tactics', 'tactics_settings')],
-            [Markup.button.callback('⬅️ Back to Hub', 'back_to_dashboard')]
+            [Markup.button.callback('⬅️ Back to Hub', 'main_menu')]
           ])
         });
       } catch (err) {
@@ -461,7 +461,7 @@ Use the menu below to fund your wallet, configure your tactics, and start snipin
 
   getMainMenu() {
     return Markup.inlineKeyboard([
-      [Markup.button.callback('🎯 Alpha Sniper', 'snipe_settings'), Markup.button.callback('👥 Copytrade', 'copytrade_settings')],
+      [Markup.button.callback('🎯 Alpha Sniper', 'alpha_sniper'), Markup.button.callback('👥 Copytrade', 'copytrade_hub')],
       [Markup.button.callback('💰 Wallet', 'wallet_settings'), Markup.button.callback('⚙️ Tactics', 'tactics_settings')],
       [Markup.button.url('📚 Documentation', 'https://docs.coresight.xyz')]
     ]);
