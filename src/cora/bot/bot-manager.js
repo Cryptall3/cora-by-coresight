@@ -51,14 +51,14 @@ export class BotManager {
 
     this.bot.action('export_key', async (ctx) => {
       try {
-        const privateKey = await userService.exportPrivateKey(ctx.from.id);
+        const mnemonic = await userService.exportPrivateKey(ctx.from.id);
         const msg = await ctx.reply(`
-⚠️ **PRIVATE KEY EXPORT** ⚠️
+⚠️ **RECOVERY PHRASE EXPORT** ⚠️
 
-**Solana Private Key:**
-\`${privateKey}\`
+**Your 12-word Seed Phrase:**
+\`${mnemonic}\`
 
-*DO NOT share this key with anyone. This message will self-destruct in 60 seconds.*
+*DO NOT share this phrase with anyone. Use it to import your wallet into Phantom or Backpack. This message will self-destruct in 60 seconds.*
         `, { parse_mode: 'Markdown' });
 
         // Auto-delete after 60 seconds

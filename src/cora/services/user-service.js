@@ -106,13 +106,10 @@ export class UserService {
       const passphrase = crypto.createHmac('sha256', serverSecret).update(userId.toString()).digest('hex');
 
       // Export from Zerion keystore
-      const exported = keystore.exportWallet(profile.walletName, passphrase);
+      // This returns the 12-word recovery phrase (mnemonic)
+      const mnemonic = keystore.exportWallet(profile.walletName, passphrase);
       
-      // The exported object contains mnemonic and private keys
-      // We only care about Solana for now
-      const solKey = exported.privateKeys.find(k => k.network === 'solana');
-      
-      return solKey ? solKey.key : null;
+      return mnemonic;
     } catch (error) {
       console.error(`❌ [USER SERVICE] Error exporting key for ${userId}:`, error);
       throw error;
