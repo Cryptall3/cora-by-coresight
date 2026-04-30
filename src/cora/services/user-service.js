@@ -79,6 +79,31 @@ export class UserService {
     return await db.collection(this.collectionName).findOne({ userId });
   }
 
+  /**
+   * Export the Solana private key for a user.
+   */
+  async exportPrivateKey(userId) {
+    try {
+      const profile = await this.getProfile(userId);
+      if (!profile) throw new Error('User profile not found');
+
+      const serverSecret = process.env.ZERION_API_KEY || 'default_secret';
+      const passphrase = crypto.createHmac('sha256', serverSecret).update(userId.toString()).digest('hex');
+
+      // Export from Zerion keystore
+      const exported = keystore.exportWallet(profile.walletName, passphrase);
+      
+      // The exported object contains mnemonic and private keys
+      // We only care about Solana for now
+      const solKey = exported.privateKeys.find(k => k.network === 'solana');
+      
+      return solKey ? solKey.key : null;
+    } catch (error) {
+      console.error(`❌ [USER SERVICE] Error exporting key for ${userId}:`, error);
+      throw error;
+    }
+  }
+
   async updateSettings(userId, settings) {
     const db = await connectToDatabase();
     return await db.collection(this.collectionName).updateOne(

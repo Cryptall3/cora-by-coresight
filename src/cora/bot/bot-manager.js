@@ -42,11 +42,10 @@ export class BotManager {
         const welcomeMsg = `
 🤖 **Welcome to Cora, ${userName}!**
 
-I am your personal autonomous trading agent, connected to the Coresight Alpha system.
+I am your personal autonomous trading agent, connected to the Coresight Alpha detection system.
 
 💳 **Your Personal Trading Wallet:**
 \`${profile.solAddress}\` (Solana)
-\`${profile.evmAddress}\` (EVM)
 
 *Status:* ${profile.settings.snipeEnabled ? '🟢 ACTIVE' : '🔴 PAUSED'}
 
@@ -77,17 +76,39 @@ Use the menu below to fund your wallet, configure your tactics, and start snipin
       const walletMsg = `
 💰 **Wallet Manager**
 
-**EVM:** \`${profile.evmAddress}\`
-**SOL:** \`${profile.solAddress}\`
+**SOL Address:** \`${profile.solAddress}\`
 
-*Note: Cora uses these addresses for all autonomous trades. Ensure they are funded with gas (ETH/SOL).*
+*Note: Cora uses this address for all autonomous trades. Ensure it is funded with SOL for gas and sniping.*
       `;
       ctx.editMessageText(walletMsg, {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
+          [Markup.button.callback('🔑 Export Private Key', 'export_key')],
           [Markup.button.callback('⬅️ Back', 'main_menu')]
         ])
       });
+    });
+
+    this.bot.action('export_key', async (ctx) => {
+      try {
+        const privateKey = await userService.exportPrivateKey(ctx.from.id);
+        const msg = await ctx.reply(`
+⚠️ **PRIVATE KEY EXPORT** ⚠️
+
+**Solana Private Key:**
+\`${privateKey}\`
+
+*DO NOT share this key with anyone. This message will self-destruct in 60 seconds.*
+        `, { parse_mode: 'Markdown' });
+
+        // Auto-delete after 60 seconds
+        setTimeout(() => {
+          ctx.deleteMessage(msg.message_id).catch(() => {});
+        }, 60000);
+
+      } catch (error) {
+        ctx.answerCbQuery('❌ Error exporting key.');
+      }
     });
 
     // Start polling
