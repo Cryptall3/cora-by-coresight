@@ -41,7 +41,7 @@ export class UserService {
         `cora-token-${userId}`, 
         walletName, 
         passphrase, 
-        Math.floor(expiresAt.getTime() / 1000)
+        Math.floor(expiresAt.getTime() / 1000).toString()
       );
 
       // 5. Store the profile in the 'cora' database
