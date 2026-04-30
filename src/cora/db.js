@@ -4,7 +4,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const uri = process.env.MONGO_URI;
-const dbName = process.env.CORESIGHT_DB_NAME || 'coresight';
+const dbName = process.env.CORA_DB_NAME || 'cora-bot';
 
 let client;
 let db;
