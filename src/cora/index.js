@@ -8,17 +8,35 @@ dotenv.config();
 async function startCora() {
   console.log('🤖 Starting Cora Agent Service...');
 
-  // 0. Dummy HTTP server for Koyeb health checks
+  // 1. Start the Telegram Bot Interface
+  const botManager = new BotManager();
+  const bot = botManager.bot;
+
+  // 0. HTTP server for Koyeb health checks AND Telegram Webhooks
   const port = process.env.PORT || 8000;
-  http.createServer((req, res) => {
+  const webhookUrl = process.env.KOYEB_PUBLIC_URL || `https://${process.env.KOYEB_APP_NAME}.koyeb.app`;
+  const webhookPath = `/telegraf/${process.env.TELEGRAM_BOT_TOKEN}`;
+
+  const server = http.createServer((req, res) => {
+    if (req.url === webhookPath) {
+      return bot.webhookCallback(webhookPath)(req, res);
+    }
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.end('Cora is alive! 🤖\n');
-  }).listen(port, '0.0.0.0', () => {
-    console.log(`📡 [HEALTH CHECK] Heartbeat server listening on port ${port}`);
   });
 
-  // 1. Start the Telegram Bot Interface
-  const bot = new BotManager();
+  server.listen(port, '0.0.0.0', async () => {
+    console.log(`📡 [SERVER] Listening on port ${port}`);
+    
+    // Set up webhook
+    try {
+      const fullUrl = `${webhookUrl}${webhookPath}`;
+      await bot.telegram.setWebhook(fullUrl);
+      console.log(`🚀 [WEBHOOK] Telegram Webhook set to: ${fullUrl}`);
+    } catch (err) {
+      console.error('❌ [WEBHOOK] Failed to set webhook:', err);
+    }
+  });
 
   // 2. Start the Signal Listener (Ears)
   const alphaListener = new AlphaListener();

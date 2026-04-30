@@ -71,9 +71,7 @@ export class BotManager {
       }
     });
 
-    // Start polling
-    this.bot.launch();
-    console.log('🚀 [BOT] Cora Telegram Bot is online.');
+    console.log('🚀 [BOT] Cora Telegram Bot initialized.');
   }
 
   async sendDashboard(ctx, isEdit = false) {
