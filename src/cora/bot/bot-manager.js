@@ -79,6 +79,135 @@ This message will self-destruct in 60 seconds.
       }
     });
 
+    this.bot.action('tactics_settings', async (ctx) => {
+      const profile = await userService.getProfile(ctx.from.id);
+      const settings = profile.settings;
+      
+      const tacticsMsg = `
+⚙️ **Trading Tactics**
+
+Define Cora's rules of engagement. These settings apply to all autonomous trades.
+
+💰 **Buy Amount:** \`${settings.defaultBuyAmount} SOL\`
+📈 **Take Profit:** \`+${settings.tpPercent}%\`
+📉 **Stop Loss:** \`-${settings.slPercent}%\`
+🌊 **Slippage:** \`${settings.slippage}%\`
+🔥 **Auto-Exit:** ${settings.autoExit ? '✅ ENABLED' : '❌ DISABLED'}
+
+*Auto-Exit ensures Cora sells automatically when TP or SL targets are hit.*
+      `;
+
+      ctx.editMessageText(tacticsMsg, {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback('💰 Buy Amount', 'set_buy'), Markup.button.callback('🌊 Slippage', 'set_slippage')],
+          [Markup.button.callback('📈 Take Profit', 'set_tp'), Markup.button.callback('📉 Stop Loss', 'set_sl')],
+          [Markup.button.callback(`${settings.autoExit ? '🔴 Disable' : '🟢 Enable'} Auto-Exit`, 'toggle_auto_exit')],
+          [Markup.button.callback('⬅️ Back', 'main_menu')]
+        ])
+      });
+    });
+
+    this.bot.action('set_buy', async (ctx) => {
+      ctx.editMessageText('💰 **Set Buy Amount**\nSelect how much SOL to spend per trade:', {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback('0.1 SOL', 'buy_0.1'), Markup.button.callback('0.25 SOL', 'buy_0.25')],
+          [Markup.button.callback('0.5 SOL', 'buy_0.5'), Markup.button.callback('1.0 SOL', 'buy_1.0')],
+          [Markup.button.callback('⬅️ Back', 'tactics_settings')]
+        ])
+      });
+    });
+
+    // Handle Quick Buy Presets
+    this.bot.action(/^buy_(.+)$/, async (ctx) => {
+      const amount = parseFloat(ctx.match[1]);
+      const profile = await userService.getProfile(ctx.from.id);
+      const newSettings = { ...profile.settings, defaultBuyAmount: amount };
+      await userService.updateSettings(ctx.from.id, newSettings);
+      
+      ctx.answerCbQuery(`Buy Amount set to ${amount} SOL ✅`);
+      ctx.callbackQuery.data = 'tactics_settings';
+      this.bot.handleUpdate(ctx.update);
+    });
+
+    this.bot.action('set_tp', async (ctx) => {
+      ctx.editMessageText('📈 **Set Take Profit**\nSelect your target profit percentage:', {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback('+50%', 'tp_50'), Markup.button.callback('+100%', 'tp_100')],
+          [Markup.button.callback('+200%', 'tp_200'), Markup.button.callback('+500%', 'tp_500')],
+          [Markup.button.callback('⬅️ Back', 'tactics_settings')]
+        ])
+      });
+    });
+
+    this.bot.action(/^tp_(.+)$/, async (ctx) => {
+      const value = parseInt(ctx.match[1]);
+      const profile = await userService.getProfile(ctx.from.id);
+      const newSettings = { ...profile.settings, tpPercent: value };
+      await userService.updateSettings(ctx.from.id, newSettings);
+      
+      ctx.answerCbQuery(`Take Profit set to +${value}% ✅`);
+      ctx.callbackQuery.data = 'tactics_settings';
+      this.bot.handleUpdate(ctx.update);
+    });
+
+    this.bot.action('set_sl', async (ctx) => {
+      ctx.editMessageText('📉 **Set Stop Loss**\nSelect your maximum loss threshold:', {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback('-15%', 'sl_15'), Markup.button.callback('-25%', 'sl_25')],
+          [Markup.button.callback('-50%', 'sl_50'), Markup.button.callback('-75%', 'sl_75')],
+          [Markup.button.callback('⬅️ Back', 'tactics_settings')]
+        ])
+      });
+    });
+
+    this.bot.action(/^sl_(.+)$/, async (ctx) => {
+      const value = parseInt(ctx.match[1]);
+      const profile = await userService.getProfile(ctx.from.id);
+      const newSettings = { ...profile.settings, slPercent: value };
+      await userService.updateSettings(ctx.from.id, newSettings);
+      
+      ctx.answerCbQuery(`Stop Loss set to -${value}% ✅`);
+      ctx.callbackQuery.data = 'tactics_settings';
+      this.bot.handleUpdate(ctx.update);
+    });
+
+    this.bot.action('set_slippage', async (ctx) => {
+      ctx.editMessageText('🌊 **Set Slippage**\nSelect your maximum slippage tolerance:', {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback('0.5%', 'slip_0.5'), Markup.button.callback('1.0%', 'slip_1.0')],
+          [Markup.button.callback('3.0%', 'slip_3.0'), Markup.button.callback('5.0%', 'slip_5.0')],
+          [Markup.button.callback('⬅️ Back', 'tactics_settings')]
+        ])
+      });
+    });
+
+    this.bot.action(/^slip_(.+)$/, async (ctx) => {
+      const value = parseFloat(ctx.match[1]);
+      const profile = await userService.getProfile(ctx.from.id);
+      const newSettings = { ...profile.settings, slippage: value };
+      await userService.updateSettings(ctx.from.id, newSettings);
+      
+      ctx.answerCbQuery(`Slippage set to ${value}% ✅`);
+      ctx.callbackQuery.data = 'tactics_settings';
+      this.bot.handleUpdate(ctx.update);
+    });
+
+    this.bot.action('toggle_auto_exit', async (ctx) => {
+      const profile = await userService.getProfile(ctx.from.id);
+      const newSettings = { ...profile.settings, autoExit: !profile.settings.autoExit };
+      await userService.updateSettings(ctx.from.id, newSettings);
+      
+      ctx.answerCbQuery(`Auto-Exit ${newSettings.autoExit ? 'Enabled' : 'Disabled'} ✅`);
+      // Refresh the menu
+      ctx.callbackQuery.data = 'tactics_settings';
+      this.bot.handleUpdate(ctx.update);
+    });
+
     console.log('🚀 [BOT] Cora Telegram Bot initialized.');
   }
 
