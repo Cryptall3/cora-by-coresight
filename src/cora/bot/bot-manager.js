@@ -11,6 +11,7 @@ const userService = new UserService();
 export class BotManager {
   constructor() {
     this.bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
+    this.userStates = new Map(); // For interactive prompts
     this.setupHandlers();
   }
 
@@ -33,49 +34,73 @@ export class BotManager {
 
     this.bot.action('wallet_settings', async (ctx) => {
       const profile = await userService.getProfile(ctx.from.id);
-      const walletMsg = `
-💰 **Wallet Manager**
+      const wallets = profile.wallets || [];
+      
+      let msg = '💳 **Wallet Manager**\n\nManage your trading capital across multiple accounts:\n\n';
+      const buttons = [];
 
-**SOL Address:** \`${profile.solAddress}\`
+      wallets.forEach((w, index) => {
+        msg += `${index + 1}. **${w.name}**\n\`${w.solAddress}\`\n\n`;
+        buttons.push([Markup.button.callback(`⚙️ Manage: ${w.name}`, `manage_wallet_${w.id}`)]);
+      });
 
-*Note: Cora uses this address for all autonomous trades. Ensure it is funded with SOL for gas and sniping.*
+      buttons.push([Markup.button.callback('➕ Create New Wallet', 'create_new_wallet')]);
+      buttons.push([Markup.button.callback('⬅️ Back', 'main_menu')]);
+
+      ctx.editMessageText(msg, {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard(buttons)
+      });
+    });
+
+    this.bot.action('create_new_wallet', async (ctx) => {
+      await userService.addWallet(ctx.from.id, `Wallet ${Math.floor(Math.random() * 1000)}`);
+      ctx.answerCbQuery('New wallet created! 🆕');
+      // Refresh Hub
+      ctx.callbackQuery.data = 'wallet_settings';
+      this.bot.handleUpdate(ctx.update);
+    });
+
+    this.bot.action(/^manage_wallet_(.+)$/, async (ctx) => {
+      const walletId = ctx.match[1];
+      const profile = await userService.getProfile(ctx.from.id);
+      const wallet = profile.wallets.find(w => w.id === walletId);
+      
+      const msg = `
+⚙️ **Manage Wallet: ${wallet.name}**
+
+**SOL Address:** \`${wallet.solAddress}\`
+
+What would you like to do with this wallet?
       `;
-      ctx.editMessageText(walletMsg, {
+
+      ctx.editMessageText(msg, {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
-          [Markup.button.callback('🔑 Export Seed Phrase', 'export_key')],
-          [Markup.button.callback('⬅️ Back', 'main_menu')]
+          [Markup.button.callback('📤 Send SOL', `send_prompt_${walletId}`)],
+          [Markup.button.callback('🏷️ Rename', `rename_prompt_${walletId}`), Markup.button.callback('🗑️ Delete', `delete_confirm_${walletId}`)],
+          [Markup.button.callback('🔑 Export Seed Phrase', `export_seed_${walletId}`)],
+          [Markup.button.callback('⬅️ Back to Hub', 'wallet_settings')]
         ])
       });
     });
 
-    this.bot.action('export_key', async (ctx) => {
+    this.bot.action(/^export_seed_(.+)$/, async (ctx) => {
+      const walletId = ctx.match[1];
       try {
-        const mnemonic = await userService.exportPrivateKey(ctx.from.id);
-        
-        // Using <tg-spoiler> for the blur effect (requires HTML parse_mode)
+        const mnemonic = await userService.exportSeedPhrase(ctx.from.id, walletId);
         const msg = await ctx.reply(`
 ⚠️ **RECOVERY PHRASE EXPORT** ⚠️
 
 <b>Your 12-word Seed Phrase:</b>
 <tg-spoiler>${mnemonic}</tg-spoiler>
 
-<i>(Tap the blurred box above to reveal)</i>
-
-DO NOT share this phrase with anyone. Use it to export your wallet.
-This message will self-destruct in 60 seconds.
-<b>Be careful not to expose this phrase.</b>
-
-<i>Note: CORESIGHT does not store your seedphrase, so it is perfectly safe.</i>
+<i>Note: CORESIGHT does not store your seedphrase. Message deletes in 60s.</i>
         `, { parse_mode: 'HTML' });
 
-        // Auto-delete after 60 seconds
-        setTimeout(() => {
-          ctx.deleteMessage(msg.message_id).catch(() => {});
-        }, 60000);
-
-      } catch (error) {
-        ctx.answerCbQuery('❌ Error exporting key.');
+        setTimeout(() => ctx.deleteMessage(msg.message_id).catch(() => {}), 60000);
+      } catch (err) {
+        ctx.answerCbQuery('❌ Error exporting.');
       }
     });
 
@@ -208,50 +233,125 @@ Define Cora's rules of engagement. These settings apply to all autonomous trades
       this.bot.handleUpdate(ctx.update);
     });
 
+    this.bot.action(/^send_prompt_(.+)$/, async (ctx) => {
+      const walletId = ctx.match[1];
+      this.userStates.set(ctx.from.id, { action: 'await_send_address', walletId });
+      ctx.reply('📤 **Send SOL**\nPlease paste the destination Solana address:');
+    });
+
+    this.bot.action(/^rename_prompt_(.+)$/, async (ctx) => {
+      const walletId = ctx.match[1];
+      this.userStates.set(ctx.from.id, { action: 'await_rename', walletId });
+      ctx.reply('🏷️ **Rename Wallet**\nPlease type the new name for this wallet:');
+    });
+
+    this.bot.action(/^delete_confirm_(.+)$/, async (ctx) => {
+      const walletId = ctx.match[1];
+      ctx.editMessageText('⚠️ **Confirm Deletion**\nAre you absolutely sure you want to delete this wallet? This cannot be undone.', {
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback('❌ Yes, Delete', `delete_exec_${walletId}`)],
+          [Markup.button.callback('⬅️ Cancel', `manage_wallet_${walletId}`)]
+        ])
+      });
+    });
+
+    this.bot.action(/^delete_exec_(.+)$/, async (ctx) => {
+      const walletId = ctx.match[1];
+      await userService.deleteWallet(ctx.from.id, walletId);
+      ctx.answerCbQuery('Wallet deleted 🗑️');
+      ctx.callbackQuery.data = 'wallet_settings';
+      this.bot.handleUpdate(ctx.update);
+    });
+
+    // Global text listener for prompts
+    this.bot.on('text', async (ctx) => {
+      const state = this.userStates.get(ctx.from.id);
+      if (!state) return;
+
+      if (state.action === 'await_rename') {
+        await userService.renameWallet(ctx.from.id, state.walletId, ctx.message.text);
+        this.userStates.delete(ctx.from.id);
+        ctx.reply(`✅ Wallet renamed to: ${ctx.message.text}`);
+        this.sendDashboard(ctx);
+      } 
+      else if (state.action === 'await_send_address') {
+        const address = ctx.message.text.trim();
+        if (address.length < 32) return ctx.reply('❌ Invalid address. Please try again.');
+        
+        state.toAddress = address;
+        state.action = 'await_send_amount';
+        ctx.reply(`Destination set to: \`${address}\`\n\nHow much SOL would you like to send?`, { parse_mode: 'Markdown' });
+      } 
+      else if (state.action === 'await_send_amount') {
+        const amount = parseFloat(ctx.message.text);
+        if (isNaN(amount) || amount <= 0) return ctx.reply('❌ Invalid amount. Please try again.');
+
+        ctx.reply(`⏳ Sending ${amount} SOL...`);
+        try {
+          const txHash = await userService.sendSOL(ctx.from.id, state.walletId, state.toAddress, amount);
+          ctx.reply(`✅ **Transfer Successful!**\n\nTransaction Hash:\n\`${txHash}\``, {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+              [Markup.button.url('🔗 View on Solscan', `https://solscan.io/tx/${txHash}`)],
+              [Markup.button.callback('⬅️ Back to Wallets', 'wallet_settings')]
+            ])
+          });
+        } catch (err) {
+          ctx.reply(`❌ **Transfer Failed:** ${err.message}`);
+        }
+        this.userStates.delete(ctx.from.id);
+      }
+    });
+
     console.log('🚀 [BOT] Cora Telegram Bot initialized.');
   }
 
   async sendDashboard(ctx, isEdit = false) {
-    const userId = ctx.from.id;
-    const userName = ctx.from.first_name || 'Trader';
+    try {
+      const userId = ctx.from.id;
+      const userName = ctx.from.first_name || 'Trader';
 
-    // 1. Check Subscription
-    const access = await subService.checkAccess(userId);
+      // 1. Check Subscription
+      const access = await subService.checkAccess(userId);
+      if (!access.hasAccess) {
+        const msg = `❌ **Access Denied**\n\nCora is an exclusive autonomous agent for Coresight Alpha members.\n\nPlease upgrade your plan to activate your personal trading agent.`;
+        const kb = Markup.inlineKeyboard([
+          [Markup.button.url('💎 Upgrade to Alpha', 'https://coresight.xyz/subscription')]
+        ]);
+        return isEdit ? ctx.editMessageText(msg, { parse_mode: 'Markdown', ...kb }) : ctx.reply(msg, { parse_mode: 'Markdown', ...kb });
+      }
 
-    if (!access.hasAccess) {
-      const msg = `❌ **Access Denied**\n\nCora is an exclusive autonomous agent for Coresight Alpha members.\n\nPlease upgrade your plan to activate your personal trading agent.`;
-      const kb = Markup.inlineKeyboard([
-        [Markup.button.url('💎 Upgrade to Alpha', 'https://coresight.xyz/subscription')]
-      ]);
-      return isEdit ? ctx.editMessageText(msg, { parse_mode: 'Markdown', ...kb }) : ctx.reply(msg, { parse_mode: 'Markdown', ...kb });
-    }
+      // 2. Get Profile & Wallet
+      const profile = await userService.createUserProfile(userId);
+      const activeWallet = profile.wallets[0];
 
-    // 2. Get Profile
-    const profile = await userService.createUserProfile(userId);
-
-    // 3. Build Dashboard
-    const welcomeMsg = `
+      // 3. Build Dashboard
+      const welcomeMsg = `
 🤖 **Welcome to Cora, ${userName}!**
 
 I am your personal autonomous trading agent, connected to the Coresight Alpha detection system.
 
-💳 **Your Personal Trading Wallet:**
-\`${profile.solAddress}\` (Solana)
+💳 **Primary Wallet:**
+\`${activeWallet.solAddress}\` (Solana)
 
 *Status:* ${profile.settings.snipeEnabled ? '🟢 ACTIVE' : '🔴 PAUSED'}
 
 Use the menu below to fund your wallet, configure your tactics, and start sniping.
-    `;
+      `;
 
-    const extra = {
-      parse_mode: 'Markdown',
-      ...this.getMainMenu()
-    };
+      const extra = {
+        parse_mode: 'Markdown',
+        ...this.getMainMenu()
+      };
 
-    if (isEdit) {
-      return ctx.editMessageText(welcomeMsg, extra);
-    } else {
-      return ctx.reply(welcomeMsg, extra);
+      if (isEdit) {
+        return ctx.editMessageText(welcomeMsg, extra);
+      } else {
+        return ctx.reply(welcomeMsg, extra);
+      }
+    } catch (error) {
+      console.error('❌ [DASHBOARD] Error:', error);
+      ctx.reply('⚠️ Error loading dashboard.');
     }
   }
 
