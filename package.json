@@ -4,6 +4,7 @@
   "description": "Zerion for AI agents and developers: wallet-analysis skill bundle and a JSON-first CLI.",
   "author": "Zerion",
   "type": "module",
+  "packageManager": "pnpm@10.13.1",
   "bin": {
     "zerion": "./cli/zerion.js"
   },
