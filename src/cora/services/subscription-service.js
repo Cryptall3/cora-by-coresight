@@ -14,8 +14,9 @@ export class SubscriptionService {
         return { hasAccess: true, plan: 'admin' };
       }
 
-      const db = await connectToDatabase();
-      const collection = db.collection(this.collectionName);
+      // Specifically connect to the coresight-bot database for subscriptions
+      const subDb = await connectToDatabase('coresight-bot');
+      const collection = subDb.collection(this.collectionName);
 
       const now = new Date();
       

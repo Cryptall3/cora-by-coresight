@@ -9,18 +9,23 @@ const dbName = process.env.CORA_DB_NAME || 'cora-bot';
 let client;
 let db;
 
-export async function connectToDatabase() {
-  if (db) return db;
+export async function connectToDatabase(name) {
+  if (db && !name) return db;
 
   if (!uri) {
     throw new Error('MONGO_URI is not defined in environment variables');
   }
 
-  client = new MongoClient(uri);
-  await client.connect();
-  db = client.db(dbName);
-  console.log(`✅ [DB] Connected to ${dbName}`);
-  return db;
+  if (!client) {
+    client = new MongoClient(uri);
+    await client.connect();
+  }
+
+  const targetDb = client.db(name || dbName);
+  if (!name) db = targetDb;
+  
+  console.log(`✅ [DB] Connected to ${name || dbName}`);
+  return targetDb;
 }
 
 export async function closeConnection() {
