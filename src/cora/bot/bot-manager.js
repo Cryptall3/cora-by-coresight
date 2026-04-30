@@ -236,18 +236,19 @@ Define Cora's rules of engagement. These settings apply to all autonomous trades
     this.bot.action(/^send_prompt_(.+)$/, async (ctx) => {
       const walletId = ctx.match[1];
       this.userStates.set(ctx.from.id, { action: 'await_send_address', walletId });
-      ctx.reply('📤 **Send SOL**\nPlease paste the destination Solana address:');
+      ctx.reply('📤 **Send SOL**\n\nPlease paste the destination Solana address:', { parse_mode: 'Markdown' });
     });
 
     this.bot.action(/^rename_prompt_(.+)$/, async (ctx) => {
       const walletId = ctx.match[1];
       this.userStates.set(ctx.from.id, { action: 'await_rename', walletId });
-      ctx.reply('🏷️ **Rename Wallet**\nPlease type the new name for this wallet:');
+      ctx.reply('🏷️ **Rename Wallet**\n\nPlease type the new name for this wallet:', { parse_mode: 'Markdown' });
     });
 
     this.bot.action(/^delete_confirm_(.+)$/, async (ctx) => {
       const walletId = ctx.match[1];
-      ctx.editMessageText('⚠️ **Confirm Deletion**\nAre you absolutely sure you want to delete this wallet? This cannot be undone.', {
+      ctx.editMessageText('⚠️ **Confirm Deletion**\n\nAre you absolutely sure you want to delete this wallet? This cannot be undone.', {
+        parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
           [Markup.button.callback('❌ Yes, Delete', `delete_exec_${walletId}`)],
           [Markup.button.callback('⬅️ Cancel', `manage_wallet_${walletId}`)]
@@ -284,12 +285,12 @@ Define Cora's rules of engagement. These settings apply to all autonomous trades
       } 
       else if (state.action === 'await_send_amount') {
         const amount = parseFloat(ctx.message.text);
-        if (isNaN(amount) || amount <= 0) return ctx.reply('❌ Invalid amount. Please try again.');
+        if (isNaN(amount) || amount <= 0) return ctx.reply('❌ **Invalid amount.** Please try again.', { parse_mode: 'Markdown' });
 
-        ctx.reply(`⏳ Sending ${amount} SOL...`);
+        ctx.reply(`⏳ **Sending ${amount} SOL...**`, { parse_mode: 'Markdown' });
         try {
           const txHash = await userService.sendSOL(ctx.from.id, state.walletId, state.toAddress, amount);
-          ctx.reply(`✅ **Transfer Successful!**\n\nTransaction Hash:\n\`${txHash}\``, {
+          ctx.reply(`✅ **Transfer Successful!**\n\n**Transaction Hash:**\n\`${txHash}\``, {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
               [Markup.button.url('🔗 View on Solscan', `https://solscan.io/tx/${txHash}`)],
