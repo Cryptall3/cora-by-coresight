@@ -1,5 +1,6 @@
 import { BotManager } from './bot/bot-manager.js';
 import { AlphaListener } from './services/alpha-listener.js';
+import { AutoExitService } from './services/auto-exit-service.js';
 import http from 'http';
 import dotenv from 'dotenv';
 
@@ -7,6 +8,7 @@ dotenv.config();
 
 const botManager = new BotManager();
 const alphaListener = new AlphaListener();
+const autoExitService = new AutoExitService();
 
 async function startCora() {
   console.log('🤖 Starting Cora Agent Service...');
@@ -17,6 +19,9 @@ async function startCora() {
     
   // 2. Start the Alpha Signal Listener (Ears)
   await alphaListener.start();
+
+  // 3. Start the Auto-Exit Monitor (Brain)
+  await autoExitService.start();
 
   // 3. HTTP server for Koyeb health checks AND Telegram Webhooks
   const port = process.env.PORT || 8000;

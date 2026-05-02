@@ -1,12 +1,14 @@
 import { Telegraf, Markup } from 'telegraf';
 import { SubscriptionService } from '../services/subscription-service.js';
 import { UserService } from '../services/user-service.js';
+import { TradeService } from '../services/trade-service.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
 const subService = new SubscriptionService();
 const userService = new UserService();
+const tradeService = new TradeService();
 
 export class BotManager {
   constructor() {
@@ -40,7 +42,7 @@ export class BotManager {
     this.bot.action('wallet_settings', async (ctx) => {
       const profile = await userService.getProfile(ctx.from.id);
       const wallets = profile.wallets || [];
-      
+
       let msg = '💳 **Wallet Manager**\n\nManage your trading capital across multiple accounts:\n\n';
       const buttons = [];
 
@@ -70,7 +72,7 @@ export class BotManager {
       const walletId = ctx.match[1];
       const profile = await userService.getProfile(ctx.from.id);
       const wallet = profile.wallets.find(w => w.id === walletId);
-      
+
       const msg = `
 ⚙️ **Manage Wallet: ${wallet.name}**
 
@@ -103,7 +105,7 @@ What would you like to do with this wallet?
 <i>Note: CORESIGHT does not store your seedphrase. Message deletes in 60s.</i>
         `, { parse_mode: 'HTML' });
 
-        setTimeout(() => ctx.deleteMessage(msg.message_id).catch(() => {}), 60000);
+        setTimeout(() => ctx.deleteMessage(msg.message_id).catch(() => { }), 60000);
       } catch (err) {
         ctx.answerCbQuery('❌ Error exporting.');
       }
@@ -112,7 +114,7 @@ What would you like to do with this wallet?
     this.bot.action('tactics_settings', async (ctx) => {
       const profile = await userService.getProfile(ctx.from.id);
       const settings = profile.settings;
-      
+
       const tacticsMsg = `
 ⚙️ **Trading Tactics**
 
@@ -312,9 +314,49 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.** Any new signals
       await userService.updateSettings(ctx.from.id, { ...profile.settings, snipeEnabled: newState });
 
       ctx.answerCbQuery(`Alpha Sniper ${newState ? 'STARTED 🚀' : 'STOPPED ⏹️'}`);
-      
+
       // Re-render the menu to show updated status
       this.bot.handleUpdate({ ...ctx.update, callback_query: { ...ctx.callbackQuery, data: 'alpha_sniper' } });
+    });
+
+    this.bot.action('pnl_dashboard', async (ctx) => {
+      console.log(`[BOT] PnL Dashboard clicked by ${ctx.from.id}`);
+      try {
+        const stats = await tradeService.getStats(ctx.from.id);
+        const history = await tradeService.getTradeHistory(ctx.from.id, 5);
+
+        let msg = `
+📈 **PnL Dashboard**
+
+**Performance Summary:**
+• Total Trades: \`${stats.totalTrades}\`
+• Win Rate: \`${stats.winRate.toFixed(1)}%\` (${stats.winCount}W / ${stats.lossCount}L)
+• Total Profit: \`${stats.totalPnL >= 0 ? '+' : ''}${stats.totalPnL.toFixed(2)}%\`
+• Total Volume: \`${stats.totalVolume.toFixed(2)} SOL\`
+
+**Recent Activity:**
+`;
+
+        if (history.length === 0) {
+          msg += `_No trades executed yet._\n`;
+        } else {
+          history.forEach(t => {
+            const pnlStr = t.status === 'open' ? '⏳ OPEN' : `${t.pnl >= 0 ? '🟢' : '🔴'} ${t.pnl.toFixed(2)}%`;
+            msg += `• **${t.symbol}**: ${pnlStr} (\`${t.buyAmount} SOL\`)\n`;
+          });
+        }
+
+        ctx.editMessageText(msg, {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('🔄 Refresh', 'pnl_dashboard')],
+            [Markup.button.callback('⬅️ Back', 'main_menu')]
+          ])
+        });
+      } catch (err) {
+        console.error('❌ [BOT] PnL Error:', err);
+        ctx.answerCbQuery('⚠️ Error loading stats.');
+      }
     });
 
     this.bot.action(/^delete_confirm_(.+)$/, async (ctx) => {
@@ -377,15 +419,15 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.** Any new signals
         this.userStates.delete(ctx.from.id);
         ctx.reply(`✅ Wallet renamed to: ${ctx.message.text}`);
         this.sendDashboard(ctx);
-      } 
+      }
       else if (state.action === 'await_send_address') {
         const address = ctx.message.text.trim();
         if (address.length < 32) return ctx.reply('❌ Invalid address. Please try again.');
-        
+
         state.toAddress = address;
         state.action = 'await_send_amount';
         ctx.reply(`Destination set to: \`${address}\`\n\nHow much SOL would you like to send?`, { parse_mode: 'Markdown' });
-      } 
+      }
       else if (state.action === 'await_send_amount') {
         const amount = parseFloat(ctx.message.text);
         if (isNaN(amount) || amount <= 0) return ctx.reply('❌ **Invalid amount.** Please try again.', { parse_mode: 'Markdown' });
@@ -462,8 +504,8 @@ Use the menu below to fund your wallet, configure your tactics, and start snipin
   getMainMenu() {
     return Markup.inlineKeyboard([
       [Markup.button.callback('🎯 Alpha Sniper', 'alpha_sniper'), Markup.button.callback('👥 Copytrade', 'copytrade_hub')],
-      [Markup.button.callback('💰 Wallet', 'wallet_settings'), Markup.button.callback('⚙️ Tactics', 'tactics_settings')],
-      [Markup.button.url('📚 Documentation', 'https://docs.coresight.xyz')]
+      [Markup.button.callback('💰 Wallet', 'wallet_settings'), Markup.button.callback('📈 PnL Stats', 'pnl_dashboard')],
+      [Markup.button.callback('⚙️ Tactics', 'tactics_settings'), Markup.button.url('📚 Docs', 'https://docs.coresight.xyz')]
     ]);
   }
 }
