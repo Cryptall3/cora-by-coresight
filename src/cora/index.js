@@ -18,7 +18,7 @@ async function startCora() {
   const bot = botManager.bot;
     
   // 2. Start the Alpha Signal Listener (Ears)
-  await alphaListener.start();
+  await alphaListener.start(botManager.bot);
 
   // 3. Start the Auto-Exit Monitor (Brain)
   await autoExitService.start(botManager.bot);

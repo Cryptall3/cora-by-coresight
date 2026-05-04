@@ -22,6 +22,7 @@ export class TradeExecutor {
     try {
       await this.initialize();
       const settings = user.settings;
+      const GAS_BUFFER = 0.005;
       
       // Use the primary wallet and its secure agent token
       const wallet = user.wallets[0]; 
@@ -29,6 +30,14 @@ export class TradeExecutor {
 
       if (!agentToken) {
         throw new Error('No secure agent token found. Please restart the sniper.');
+      }
+
+      // 0. Pre-flight Balance Check
+      const balance = await userService.getSolBalance(wallet.solAddress);
+      const required = parseFloat(settings.defaultBuyAmount) + GAS_BUFFER;
+      
+      if (balance.amount < required) {
+        throw new Error(`insufficient_sol: Required ${required} SOL, found ${balance.amount.toFixed(4)} SOL`);
       }
 
       console.log(`🚀 [EXECUTOR] Starting trade for ${user.userId} | Token: ${token.symbol}`);
@@ -79,6 +88,7 @@ export class TradeExecutor {
   async executeSell(user, trade) {
     try {
       await this.initialize();
+      const GAS_BUFFER = 0.005;
       
       // Use the primary wallet and its secure agent token
       const wallet = user.wallets[0]; 
@@ -86,6 +96,12 @@ export class TradeExecutor {
 
       if (!agentToken) {
         throw new Error('No secure agent token found.');
+      }
+
+      // 0. Pre-flight Gas Check
+      const balance = await userService.getSolBalance(wallet.solAddress);
+      if (balance.amount < GAS_BUFFER) {
+        throw new Error(`insufficient_gas: Required ${GAS_BUFFER} SOL for gas, found ${balance.amount.toFixed(4)} SOL`);
       }
 
       console.log(`📉 [EXECUTOR] Starting SELL for ${user.userId} | Token: ${trade.symbol}`);

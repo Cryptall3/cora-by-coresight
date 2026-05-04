@@ -13,8 +13,9 @@ export class AlphaListener {
     this.changeStream = null;
   }
 
-  async start() {
+  async start(bot = null) {
     if (this.isRunning) return;
+    this.bot = bot;
     
     try {
       console.log('📡 [ALPHA LISTENER] Connecting to signal stream...');
@@ -112,6 +113,21 @@ export class AlphaListener {
         console.log(`💰 [SNIPE-SUCCESS] User ${user.userId} bought ${token.symbol}! Hash: ${result.hash}`);
       } else {
         console.error(`⚠️ [SNIPE-FAIL] User ${user.userId} failed: ${result.error}`);
+        
+        if (this.bot) {
+          const reason = result.error.includes('insufficient') ? 'Insufficient SOL balance' : result.error;
+          const msg = `
+⚠️ **Alpha Sniper: Buy Failed**
+
+**Token:** $${token.symbol}
+**Address:** \`${token.mint}\`
+**Reason:** ${reason}
+
+_Required: \`${(user.settings.defaultBuyAmount + 0.005).toFixed(3)} SOL\` (inc. gas)_
+_Please fund your primary wallet to resume sniping._
+          `;
+          await this.bot.telegram.sendMessage(user.userId, msg, { parse_mode: 'Markdown' }).catch(() => {});
+        }
       }
     } catch (error) {
       console.error(`❌ [SNIPE-EXEC] Critical Error for user ${user.userId}:`, error);

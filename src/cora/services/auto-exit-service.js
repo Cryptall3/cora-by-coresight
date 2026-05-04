@@ -146,10 +146,36 @@ Cora has completed her mission window. New signals will not be sniped.
       // 4. Check Targets
       if (pnlPercent >= tpPercent) {
         console.log(`🎯 [AUTO-EXIT] TP REACHED for ${trade.symbol} (+${pnlPercent.toFixed(2)}%)! Selling...`);
-        await tradeExecutor.executeSell(profile, trade);
+        const res = await tradeExecutor.executeSell(profile, trade);
+        if (!res.success && this.bot) {
+          const msg = `
+⚠️ **Auto-Exit: Sell Failed**
+
+**Token:** $${trade.symbol}
+**Address:** \`${trade.mint}\`
+**Reason:** Insufficient SOL for gas.
+
+Cora tried to secure your profit at **+${pnlPercent.toFixed(1)}%** but couldn't cover the network fees.
+_Please add at least 0.005 SOL to your wallet immediately._
+          `;
+          await this.bot.telegram.sendMessage(profile.userId, msg, { parse_mode: 'Markdown' }).catch(() => {});
+        }
       } else if (pnlPercent <= -slPercent) {
         console.log(`📉 [AUTO-EXIT] SL REACHED for ${trade.symbol} (-${Math.abs(pnlPercent).toFixed(2)}%)! Selling...`);
-        await tradeExecutor.executeSell(profile, trade);
+        const res = await tradeExecutor.executeSell(profile, trade);
+        if (!res.success && this.bot) {
+          const msg = `
+⚠️ **Auto-Exit: Stop Loss Failed**
+
+**Token:** $${trade.symbol}
+**Address:** \`${trade.mint}\`
+**Reason:** Insufficient SOL for gas.
+
+Cora tried to exit your position at **${pnlPercent.toFixed(1)}%** but couldn't cover the network fees.
+_Please add at least 0.005 SOL to your wallet immediately._
+          `;
+          await this.bot.telegram.sendMessage(profile.userId, msg, { parse_mode: 'Markdown' }).catch(() => {});
+        }
       }
 
     } catch (error) {
