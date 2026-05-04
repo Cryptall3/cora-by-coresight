@@ -21,7 +21,7 @@ async function startCora() {
   await alphaListener.start();
 
   // 3. Start the Auto-Exit Monitor (Brain)
-  await autoExitService.start();
+  await autoExitService.start(botManager.bot);
 
   // 3. HTTP server for Koyeb health checks AND Telegram Webhooks
   const port = process.env.PORT || 8000;

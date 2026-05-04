@@ -61,7 +61,7 @@ export class TradeExecutor {
 
       if (result.status === 'success') {
         console.log(`✅ [TRADE] Success! TX: ${result.hash}`);
-        await this.recordTrade(user.userId, token, quote, result);
+        await this.recordTrade(user.userId, token, quote, result, settings.currentMissionId);
         return { success: true, hash: result.hash };
       } else {
         throw new Error(result.error || 'Swap failed');
@@ -146,9 +146,10 @@ export class TradeExecutor {
     }
   }
 
-  async recordTrade(userId, token, quote, result) {
+  async recordTrade(userId, token, quote, result, missionId = null) {
     const trade = {
       userId,
+      missionId,
       mint: token.mint,
       symbol: token.symbol,
       buyAmount: quote.inputAmount,

@@ -124,6 +124,7 @@ Define Cora's rules of engagement. These settings apply to all autonomous trades
 📈 **Take Profit:** \`+${settings.tpPercent}%\`
 📉 **Stop Loss:** \`-${settings.slPercent}%\`
 🌊 **Slippage:** \`${settings.slippage}%\`
+⏱️ **Mission Window:** \`${settings.missionDuration ? (settings.missionDuration / 3600000) + 'h' : '♾️ Indefinite'}\`
 🔥 **Auto-Exit:** ${settings.autoExit ? '✅ ENABLED' : '❌ DISABLED'}
 
 *Auto-Exit ensures Cora sells automatically when TP or SL targets are hit.*
@@ -133,11 +134,32 @@ Define Cora's rules of engagement. These settings apply to all autonomous trades
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
           [Markup.button.callback('💰 Buy Amount', 'set_buy'), Markup.button.callback('🌊 Slippage', 'set_slippage')],
-          [Markup.button.callback('📈 Take Profit', 'set_tp'), Markup.button.callback('📉 Stop Loss', 'set_sl')],
+          [Markup.button.callback('📈 TP %', 'set_tp'), Markup.button.callback('📉 SL %', 'set_sl')],
+          [Markup.button.callback('⏱️ Mission Window', 'set_mission')],
           [Markup.button.callback(`${settings.autoExit ? '🔴 Disable' : '🟢 Enable'} Auto-Exit`, 'toggle_auto_exit')],
           [Markup.button.callback('⬅️ Back', 'main_menu')]
         ])
       });
+    });
+
+    this.bot.action('set_mission', async (ctx) => {
+      ctx.editMessageText('⏱️ **Mission Window**\n\nHow long should Cora stay active after you start the sniper?\n\n_Note: Existing trades will still be monitored after the window closes._', {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback('1 Hour', 'mission_3600000'), Markup.button.callback('4 Hours', 'mission_14400000')],
+          [Markup.button.callback('12 Hours', 'mission_43200000'), Markup.button.callback('24 Hours', 'mission_86400000')],
+          [Markup.button.callback('♾️ Indefinite', 'mission_null')],
+          [Markup.button.callback('⬅️ Back', 'tactics_settings')]
+        ])
+      });
+    });
+
+    this.bot.action(/^mission_(.+)$/, async (ctx) => {
+      const val = ctx.match[1] === 'null' ? null : parseInt(ctx.match[1]);
+      const profile = await userService.getProfile(ctx.from.id);
+      await userService.updateSettings(ctx.from.id, { ...profile.settings, missionDuration: val });
+      ctx.answerCbQuery(`Mission Window updated ✅`);
+      this.bot.handleUpdate({ ...ctx.update, callback_query: { ...ctx.callbackQuery, data: 'tactics_settings' } });
     });
 
     this.bot.action('set_buy', async (ctx) => {
@@ -274,7 +296,18 @@ Define Cora's rules of engagement. These settings apply to all autonomous trades
         const activeWallet = profile.wallets[0]; // Sniping uses primary wallet
         const settings = profile.settings || {};
 
-        const statusEmoji = settings.snipeEnabled ? '🟢 RUNNING' : '🔴 PAUSED';
+        let statusEmoji = settings.snipeEnabled ? '🟢 ACTIVE MISSION' : '🔴 PAUSED';
+        let timeInfo = '';
+
+        if (settings.snipeEnabled && settings.snipeExpiration) {
+          const diff = new Date(settings.snipeExpiration).getTime() - Date.now();
+          if (diff > 0) {
+            const h = Math.floor(diff / 3600000);
+            const m = Math.floor((diff % 3600000) / 60000);
+            timeInfo = `\n⏱️ **Ends in:** \`${h}h ${m}m\``;
+          }
+        }
+
         const toggleLabel = settings.snipeEnabled ? '⏹️ Stop Sniper' : '🚀 Start Sniper';
 
         const msg = `
@@ -282,7 +315,7 @@ Define Cora's rules of engagement. These settings apply to all autonomous trades
 
 You are about to connect Cora to the **Coresight Alpha** detection system. 
 
-${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.** Any new signals will be executed immediately.' : 'Cora will monitor all Alpha signals and execute trades based on these metrics:'}
+${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will monitor all Alpha signals and execute trades based on these metrics:'}
 
 💳 **Wallet:** \`${activeWallet.solAddress}\`
 💰 **Buy Amount:** \`${settings.defaultBuyAmount || 0.1} SOL\`
@@ -290,8 +323,9 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.** Any new signals
 📉 **Stop Loss:** \`-${settings.slPercent || 50}%\`
 🌊 **Slippage:** \`${settings.slippage || 1.0}%\`
 🔄 **Auto-Exit:** \`${settings.autoExit ? 'ENABLED' : 'DISABLED'}\`
+⏱️ **Window:** \`${settings.missionDuration ? (settings.missionDuration / 3600000) + 'h' : 'Indefinite'}\`
 
-*Status:* **${statusEmoji}**
+*Status:* **${statusEmoji}**${timeInfo}
         `;
 
         await ctx.editMessageText(msg, {
@@ -310,10 +344,19 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.** Any new signals
 
     this.bot.action('toggle_sniper', async (ctx) => {
       const profile = await userService.getProfile(ctx.from.id);
-      const newState = !profile.settings.snipeEnabled;
-      await userService.updateSettings(ctx.from.id, { ...profile.settings, snipeEnabled: newState });
-
-      ctx.answerCbQuery(`Alpha Sniper ${newState ? 'STARTED 🚀' : 'STOPPED ⏹️'}`);
+      const isStarting = !profile.settings.snipeEnabled;
+      
+      if (isStarting) {
+        await userService.startSniperMission(ctx.from.id);
+        ctx.answerCbQuery('Mission Started! 🚀');
+      } else {
+        await userService.updateSettings(ctx.from.id, { 
+          ...profile.settings, 
+          snipeEnabled: false,
+          snipeExpiration: null 
+        });
+        ctx.answerCbQuery('Mission Aborted ⏹️');
+      }
 
       // Re-render the menu to show updated status
       this.bot.handleUpdate({ ...ctx.update, callback_query: { ...ctx.callbackQuery, data: 'alpha_sniper' } });

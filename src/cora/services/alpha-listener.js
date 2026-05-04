@@ -38,9 +38,14 @@ export class AlphaListener {
         const token = change.fullDocument;
         console.log(`🎯 [SIGNAL] New Alpha Detected: ${token.symbol} (${token.mint})`);
 
-        // 3. Find all users with sniping enabled
+        // 3. Find all users with sniping enabled and valid mission window
         const activeSnipers = await profileCollection.find({
-          'settings.snipeEnabled': true
+          'settings.snipeEnabled': true,
+          $or: [
+            { 'settings.snipeExpiration': { $exists: false } },
+            { 'settings.snipeExpiration': null },
+            { 'settings.snipeExpiration': { $gt: new Date() } }
+          ]
         }).toArray();
 
         if (activeSnipers.length === 0) {
@@ -79,7 +84,14 @@ export class AlphaListener {
           lastSeenId = token._id;
           console.log(`🎯 [SIGNAL-POLL] New Alpha Detected: ${token.symbol}`);
           
-          const activeSnipers = await profileCollection.find({ 'settings.snipeEnabled': true }).toArray();
+          const activeSnipers = await profileCollection.find({ 
+            'settings.snipeEnabled': true,
+            $or: [
+              { 'settings.snipeExpiration': { $exists: false } },
+              { 'settings.snipeExpiration': null },
+              { 'settings.snipeExpiration': { $gt: new Date() } }
+            ]
+          }).toArray();
           for (const user of activeSnipers) {
             this.executeSnipe(user, token);
           }

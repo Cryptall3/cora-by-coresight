@@ -132,13 +132,47 @@ export class UserService {
           tpPercent: 100,
           slPercent: 50,
           slippage: 1.0,
-          autoExit: false
+          autoExit: false,
+          missionDuration: null, // Default: Indefinite
+          snipeExpiration: null,
+          currentMissionId: null
         },
         createdAt: new Date()
       });
     }
 
     return await collection.findOne({ userId });
+  }
+
+  /**
+   * Start a new sniping mission with a specific expiration.
+   */
+  async startSniperMission(userId) {
+    const db = await connectToDatabase();
+    const collection = db.collection(this.collectionName);
+    const profile = await collection.findOne({ userId });
+    
+    if (!profile) throw new Error('Profile not found');
+
+    const missionId = `MISSION-${Date.now()}`;
+    let expiration = null;
+
+    if (profile.settings.missionDuration) {
+      expiration = new Date(Date.now() + profile.settings.missionDuration);
+    }
+
+    await collection.updateOne(
+      { userId },
+      { 
+        $set: { 
+          'settings.snipeEnabled': true,
+          'settings.snipeExpiration': expiration,
+          'settings.currentMissionId': missionId
+        } 
+      }
+    );
+
+    return { missionId, expiration };
   }
 
   async getProfile(userId) {
