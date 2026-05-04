@@ -313,7 +313,7 @@ Define Cora's rules of engagement. These settings apply to all autonomous trades
         const msg = `
 🎯 **Alpha Sniper Configuration**
 
-You are about to connect Cora to the **Coresight Alpha** detection system. 
+${settings.snipeEnabled ? 'You have connected Cora to the **Coresight Alpha** detection system.' : 'You are about to connect Cora to the **Coresight Alpha** detection system.'}
 
 ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will monitor all Alpha signals and execute trades based on these metrics:'}
 
