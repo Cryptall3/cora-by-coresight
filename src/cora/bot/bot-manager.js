@@ -479,7 +479,7 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.** Any new signals
       const welcomeMsg = `
 🤖 **Welcome to Cora, ${userName}!**
 
-I am your personal autonomous trading agent, connected to the Coresight Alpha detection system.
+I am your personal autonomous trading agent powered by **ZERION**, connected to the Coresight Alpha detection system.
 
 💳 **Primary Wallet:**
 \`${activeWallet.solAddress}\`
