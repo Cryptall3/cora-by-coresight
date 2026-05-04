@@ -33,11 +33,11 @@ export class TradeExecutor {
       }
 
       // 0. Pre-flight Balance Check
-      const balance = await userService.getSolBalance(wallet.solAddress);
+      const solBalance = await userService.getSolBalance(wallet.solAddress);
       const required = parseFloat(settings.defaultBuyAmount) + GAS_BUFFER;
       
-      if (balance.amount < required) {
-        throw new Error(`insufficient_sol: Required ${required} SOL, found ${balance.amount.toFixed(4)} SOL`);
+      if (solBalance.amount < required) {
+        throw new Error(`insufficient_sol: Required ${required} SOL, found ${solBalance.amount.toFixed(4)} SOL`);
       }
 
       console.log(`🚀 [EXECUTOR] Starting trade for ${user.userId} | Token: ${token.symbol}`);
@@ -99,9 +99,9 @@ export class TradeExecutor {
       }
 
       // 0. Pre-flight Gas Check
-      const balance = await userService.getSolBalance(wallet.solAddress);
-      if (balance.amount < GAS_BUFFER) {
-        throw new Error(`insufficient_gas: Required ${GAS_BUFFER} SOL for gas, found ${balance.amount.toFixed(4)} SOL`);
+      const solBalance = await userService.getSolBalance(wallet.solAddress);
+      if (solBalance.amount < GAS_BUFFER) {
+        throw new Error(`insufficient_gas: Required ${GAS_BUFFER} SOL for gas, found ${solBalance.amount.toFixed(4)} SOL`);
       }
 
       console.log(`📉 [EXECUTOR] Starting SELL for ${user.userId} | Token: ${trade.symbol}`);
