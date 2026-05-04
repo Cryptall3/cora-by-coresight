@@ -471,14 +471,19 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.** Any new signals
       const profile = await userService.createUserProfile(userId);
       const activeWallet = profile.wallets[0];
 
-      // 3. Build Dashboard
+      // 3. Fetch Balance
+      const balance = await userService.getSolBalance(activeWallet.solAddress);
+      const balanceStr = `${balance.amount.toFixed(3)} SOL (~$${balance.usdValue.toFixed(2)})`;
+
+      // 4. Build Dashboard
       const welcomeMsg = `
 🤖 **Welcome to Cora, ${userName}!**
 
 I am your personal autonomous trading agent, connected to the Coresight Alpha detection system.
 
 💳 **Primary Wallet:**
-\`${activeWallet.solAddress}\` (Solana)
+\`${activeWallet.solAddress}\`
+💰 **Balance:** \`${balanceStr}\`
 
 *Status:* ${profile.settings.snipeEnabled ? '🟢 ACTIVE' : '🔴 PAUSED'}
 

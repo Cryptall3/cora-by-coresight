@@ -245,4 +245,29 @@ export class UserService {
       throw error;
     }
   }
+
+  /**
+   * Fetch SOL balance and USD value for a specific address using Zerion API.
+   */
+  async getSolBalance(address) {
+    try {
+      const { getPositions } = await import('../../../cli/utils/api/client.js');
+      const response = await getPositions(address, { 
+        chainId: 'solana',
+        positionFilter: 'only_simple'
+      });
+
+      const solPosition = (response.data || []).find(
+        p => p.attributes.fungible_info?.symbol === 'SOL'
+      );
+
+      return {
+        amount: solPosition?.attributes?.quantity?.float ?? 0,
+        usdValue: solPosition?.attributes?.value ?? 0
+      };
+    } catch (error) {
+      console.error('❌ [USER SERVICE] Balance fetch error:', error);
+      return { amount: 0, usdValue: 0 };
+    }
+  }
 }
