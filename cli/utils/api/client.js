@@ -14,9 +14,20 @@ export async function fetchAPI(pathname, params = {}, auth) {
   const resolved = auth || resolveApiKeyAuth();
 
   const url = new URL(`${API_BASE}${pathname}`);
-  for (const [key, value] of Object.entries(params)) {
-    if (value === undefined || value === null || value === "") continue;
-    url.searchParams.set(key, String(value));
+  
+  // SPECIAL HANDLING FOR ZERION SWAP API: 
+  // Brackets [ ] in parameter names must NOT be URL-encoded for Solana/SVM 
+  // validation to work correctly. URLSearchParams automatically encodes them.
+  let queryString = '';
+  const entries = Object.entries(params).filter(([_, v]) => v !== undefined && v !== null && v !== "");
+  
+  if (pathname.startsWith('/swap/')) {
+    queryString = entries.map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`).join('&');
+    url.search = `?${queryString}`;
+  } else {
+    for (const [key, value] of entries) {
+      url.searchParams.set(key, String(value));
+    }
   }
 
   const headers = { Accept: "application/json" };
