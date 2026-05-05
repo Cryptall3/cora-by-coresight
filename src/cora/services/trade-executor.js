@@ -49,28 +49,30 @@ export class TradeExecutor {
 
       console.log(`🚀 [EXECUTOR] Starting trade for ${user.userId} | Token: ${token.symbol}`);
 
-      // 1. Get Quote
-      const quote = await getSwapQuote({
-        fromToken: 'SOL',
-        toToken: token.mint,
-        amount: settings.defaultBuyAmount.toString(),
-        fromChain: 'solana',
-        toChain: 'solana',
-        walletAddress: wallet.solAddress,
-        slippage: settings.slippage
-      });
-
-      console.log(`📝 [QUOTE] Found route for ${token.symbol}. Est. Output: ${quote.estimatedOutput}`);
-
-      // 2. Execute Swap using the Agent Token
-      // We temporarily set the agent token in the environment for the OWS signer
+      // 1. Prepare CLI Environment
       process.env.ZERION_AGENT_TOKEN = agentToken;
       
-      const result = await executeSwap(
-        quote,
-        wallet.walletName,
-        null // We pass NULL because we are using the Agent Token for signing
-      );
+      // 2. Execute via CLI Logic
+      // We import the CLI's own swap command to ensure perfect parameter assembly
+      const swapCommand = (await import('../../../cli/commands/trading/swap.js')).default;
+      
+      const args = ['SOL', token.mint, settings.defaultBuyAmount.toString()];
+      const flags = {
+        chain: 'solana',
+        wallet: wallet.walletName,
+        slippage: Math.min(settings.slippage || 1, 3).toString() // CLI caps at 3%
+      };
+
+      console.log(`📡 [CLI-MODE] Executing: zerion swap ${args.join(' ')} --chain ${flags.chain} --slippage ${flags.slippage}`);
+
+      // CLI command handles quote, signing, and broadcasting internally
+      await swapCommand(args, flags);
+
+      return {
+        success: true,
+        symbol: token.symbol,
+        amount: settings.defaultBuyAmount
+      };
 
       // Cleanup
       delete process.env.ZERION_AGENT_TOKEN;
