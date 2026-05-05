@@ -32,6 +32,13 @@ export class TradeExecutor {
         throw new Error('No secure agent token found. Please restart the sniper.');
       }
 
+      console.log('FROM ADDR:', wallet.solAddress, 'len:', wallet.solAddress?.length);
+      
+      // Safety Guard: Force Solana check
+      if (!wallet.solAddress || wallet.solAddress.startsWith('0x') || wallet.solAddress.length < 32) {
+        throw new Error(`Invalid Solana wallet: ${wallet.solAddress}. Reverting to EVM protection.`);
+      }
+
       // 0. Pre-flight Balance Check
       const solBalance = await userService.getSolBalance(wallet.solAddress);
       const required = parseFloat(settings.defaultBuyAmount) + GAS_BUFFER;
