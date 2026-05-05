@@ -38,7 +38,6 @@ export async function getSwapQuote({
   const cappedSlippage = Math.min(slippage ?? getConfigValue("slippage") ?? DEFAULT_SLIPPAGE, 3.0);
 
   const params = {
-    "input[from]": walletAddress,
     "input[chain_id]": fromChain,
     "input[fungible_id]": fromResolved.fungibleId,
     "input[amount]": amountInSmallestUnits,
@@ -46,6 +45,12 @@ export async function getSwapQuote({
     "slippage_percent": cappedSlippage,
     sort: "amount",
   };
+
+  // Skip input[from] for Solana to bypass the API's hardcoded EVM validator.
+  // The aggregator doesn't need the wallet for a quote; it's only needed for signing.
+  if (fromChain !== "solana") {
+    params["input[from]"] = walletAddress;
+  }
 
   // For Solana SPL tokens, use asset_address (mint) for better chain resolution
   if (toResolved.address && fromChain === "solana") {
