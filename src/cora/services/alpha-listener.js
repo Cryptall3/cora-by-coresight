@@ -111,6 +111,23 @@ export class AlphaListener {
       
       if (result.success) {
         console.log(`💰 [SNIPE-SUCCESS] User ${user.userId} bought ${token.symbol}! Hash: ${result.hash}`);
+        
+        if (this.bot) {
+          const msg = `
+🚀 **Alpha Sniper: Position Opened!**
+
+**Token:** $${token.symbol}
+**Amount:** ${result.amount} SOL
+**Price:** $${result.price > 0 ? result.price.toFixed(8) : 'Market'}
+**TX:** [View on Solscan](https://solscan.io/tx/${result.hash})
+
+_Cora is now monitoring this position for Take Profit (+${user.settings.takeProfit}%) and Stop Loss (-${user.settings.stopLoss}%)._
+          `;
+          await this.bot.telegram.sendMessage(user.userId, msg, { 
+            parse_mode: 'Markdown',
+            disable_web_page_preview: true
+          }).catch(() => {});
+        }
       } else {
         console.error(`⚠️ [SNIPE-FAIL] User ${user.userId} failed: ${result.error}`);
         

@@ -71,7 +71,12 @@ export class TradeExecutor {
       if (result.status === 'success') {
         console.log(`✅ [TRADE] Success! TX: ${result.hash}`);
         await this.recordTrade(user.userId, token, quote, result, settings.currentMissionId);
-        return { success: true, hash: result.hash };
+        return { 
+          success: true, 
+          hash: result.hash, 
+          amount: settings.defaultBuyAmount,
+          price: token.price || 0
+        };
       } else {
         throw new Error(result.error || 'Swap failed');
       }
