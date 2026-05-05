@@ -21,11 +21,15 @@ export class TradeExecutor {
   async executeSnipe(user, token) {
     try {
       await this.initialize();
-      const settings = user.settings;
+      
+      // ENSURE WALLETS ARE LOADED: Restore from DB to memory keystore
+      // The listener fetches raw profiles, so we must activate them for CLI usage
+      const activeProfile = await userService.createUserProfile(user.userId);
+      const settings = activeProfile.settings;
       const GAS_BUFFER = 0.005;
       
       // Use the primary wallet and its secure agent token
-      const wallet = user.wallets[0]; 
+      const wallet = activeProfile.wallets[0]; 
       const agentToken = wallet.agentToken;
 
       if (!agentToken) {
