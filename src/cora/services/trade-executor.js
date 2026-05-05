@@ -70,7 +70,20 @@ export class TradeExecutor {
       console.log(`📡 [CLI-MODE] Executing: zerion swap ${args.join(' ')} --chain ${flags.chain} --slippage ${flags.slippage}`);
 
       // CLI command handles quote, signing, and broadcasting internally
-      await swapCommand(args, flags);
+      try {
+        // Temporarily override process.exit to prevent CLI from killing the bot
+        const originalExit = process.exit;
+        process.exit = (code) => { 
+          if (code !== 0) throw new Error(`CLI exited with code ${code}`); 
+        };
+        
+        await swapCommand(args, flags);
+        
+        process.exit = originalExit; // Restore
+      } catch (cliError) {
+        console.error(`❌ [CLI-FAIL] Swap failed:`, cliError.message);
+        throw cliError;
+      }
 
       return {
         success: true,
