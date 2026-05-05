@@ -82,8 +82,16 @@ export class TradeExecutor {
       }
 
     } catch (error) {
-      console.error(`❌ [EXECUTOR] Trade failed for user ${user.userId}:`, error.message);
-      return { success: false, error: error.message };
+      let detailedError = error.message;
+      if (error.response) {
+        console.error(`❌ [ZERION ERROR BODY]:`, JSON.stringify(error.response, null, 2));
+        // Extract a human-readable reason if available
+        const zerionMsg = error.response.errors?.[0]?.detail || error.response.message;
+        if (zerionMsg) detailedError = `Zerion: ${zerionMsg}`;
+      }
+      
+      console.error(`❌ [EXECUTOR] Trade failed for user ${user.userId}:`, detailedError);
+      return { success: false, error: detailedError };
     }
   }
 
@@ -147,8 +155,15 @@ export class TradeExecutor {
       }
 
     } catch (error) {
-      console.error(`❌ [EXECUTOR] Sell failed for user ${user.userId}:`, error.message);
-      return { success: false, error: error.message };
+      let detailedError = error.message;
+      if (error.response) {
+        console.error(`❌ [ZERION SELL ERROR BODY]:`, JSON.stringify(error.response, null, 2));
+        const zerionMsg = error.response.errors?.[0]?.detail || error.response.message;
+        if (zerionMsg) detailedError = `Zerion: ${zerionMsg}`;
+      }
+
+      console.error(`❌ [EXECUTOR] Sell failed for user ${user.userId}:`, detailedError);
+      return { success: false, error: detailedError };
     }
   }
 
