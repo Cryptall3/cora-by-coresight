@@ -175,6 +175,11 @@ export function handleTradingError(err, fallbackCode) {
     printError(err.code || fallbackCode, err.message, {
       suggestion: err.suggestion,
     });
+    
+    // DEBUG: Print full response body if available for deep diagnostics
+    if (err.response) {
+      console.error('❌ [ZERION ERROR BODY]:', JSON.stringify(err.response, null, 2));
+    }
   }
   process.exit(1);
 }
