@@ -24,6 +24,7 @@ export async function fetchAPI(pathname, params = {}, auth) {
   if (pathname.startsWith('/swap/')) {
     queryString = entries.map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`).join('&');
     url.search = `?${queryString}`;
+    console.log(`📡 [ZERION SWAP API] ${url.href}`);
   } else {
     for (const [key, value] of entries) {
       url.searchParams.set(key, String(value));

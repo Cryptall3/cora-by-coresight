@@ -34,17 +34,12 @@ export async function getSwapQuote({
   // Convert amount to smallest units using viem's parseUnits for precision
   const amountInSmallestUnits = parseUnits(amount, fromResolved.decimals).toString();
 
-  // Zerion API v1 requires CAIP-2 identifiers for Solana to avoid EVM defaulting
-  const solanaCaip2 = "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp";
-  const apiFromChain = fromChain === "solana" ? solanaCaip2 : fromChain;
-  const apiToChain = toChain === "solana" ? solanaCaip2 : (toChain || fromChain);
-
   const params = {
     "input[from]": walletAddress,
-    "input[chain_id]": apiFromChain,
+    "input[chain_id]": fromChain,
     "input[fungible_id]": fromResolved.fungibleId,
     "input[amount]": amountInSmallestUnits,
-    "output[chain_id]": apiToChain,
+    "output[chain_id]": toChain || fromChain,
     "output[fungible_id]": toResolved.fungibleId,
     "slippage_percent": slippage ?? getConfigValue("slippage") ?? DEFAULT_SLIPPAGE,
     sort: "amount",
