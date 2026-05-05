@@ -34,16 +34,25 @@ export async function getSwapQuote({
   // Convert amount to smallest units using viem's parseUnits for precision
   const amountInSmallestUnits = parseUnits(amount, fromResolved.decimals).toString();
 
+  // Zerion v1 Swap API limits slippage to 3.0% max. Higher values cause validation errors.
+  const cappedSlippage = Math.min(slippage ?? getConfigValue("slippage") ?? DEFAULT_SLIPPAGE, 3.0);
+
   const params = {
     "input[from]": walletAddress,
     "input[chain_id]": fromChain,
     "input[fungible_id]": fromResolved.fungibleId,
     "input[amount]": amountInSmallestUnits,
     "output[chain_id]": toChain || fromChain,
-    "output[fungible_id]": toResolved.fungibleId,
-    "slippage_percent": slippage ?? getConfigValue("slippage") ?? DEFAULT_SLIPPAGE,
+    "slippage_percent": cappedSlippage,
     sort: "amount",
   };
+
+  // For Solana SPL tokens, use asset_address (mint) for better chain resolution
+  if (toResolved.address && fromChain === "solana") {
+    params["output[asset_address]"] = toResolved.address;
+  } else {
+    params["output[fungible_id]"] = toResolved.fungibleId;
+  }
 
   const response = await api.getSwapOffers(params);
   const offers = response.data || [];
