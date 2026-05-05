@@ -22,7 +22,18 @@ export async function fetchAPI(pathname, params = {}, auth) {
   const entries = Object.entries(params).filter(([_, v]) => v !== undefined && v !== null && v !== "");
   
   if (pathname.startsWith('/swap/')) {
-    queryString = entries.map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`).join('&');
+    // CONTEXT-FIRST ORDERING: Chain ID must come before the address to set validation mode
+    const orderedParams = {
+      "input[chain_id]": params["input[chain_id]"],
+      "output[chain_id]": params["output[chain_id]"],
+      ...params
+    };
+    
+    queryString = Object.entries(orderedParams)
+      .filter(([_, v]) => v !== undefined && v !== null && v !== "")
+      .map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`)
+      .join('&');
+      
     url.search = `?${queryString}`;
     console.log(`📡 [ZERION SWAP API] ${url.href}`);
   } else {
@@ -31,7 +42,10 @@ export async function fetchAPI(pathname, params = {}, auth) {
     }
   }
 
-  const headers = { Accept: "application/json" };
+  const headers = { 
+    Accept: "application/json",
+    "X-Zerion-Chain": params["input[chain_id]"] || params["filter[chain_id]"] || "ethereum"
+  };
   let fetchFn;
   switch (resolved.kind) {
     case "apiKey":
