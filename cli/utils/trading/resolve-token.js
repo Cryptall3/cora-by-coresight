@@ -10,10 +10,6 @@ const NATIVE_ALIASES = new Map([
   ["ETH", { fungibleId: "eth", symbol: "ETH", decimals: 18, address: NATIVE_ASSET_ADDRESS }],
   ["SOL", { fungibleId: "sol", symbol: "SOL", decimals: 9, address: "So11111111111111111111111111111111111111112" }],
   ["WETH", { fungibleId: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2", symbol: "WETH", decimals: 18 }],
-  ["USDC", { fungibleId: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", symbol: "USDC", decimals: 6 }],
-  ["USDT", { fungibleId: "0xdac17f958d2ee523a2206206994597c13d831ec7", symbol: "USDT", decimals: 6 }],
-  ["DAI", { fungibleId: "0x6b175474e89094c44da98b954eedeac495271d0f", symbol: "DAI", decimals: 18 }],
-  ["WBTC", { fungibleId: "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599", symbol: "WBTC", decimals: 8 }],
 ]);
 
 /**
@@ -74,7 +70,10 @@ export async function resolveToken(query, chainId) {
   const verified = results.find((r) => r.attributes?.flags?.verified);
   const best = verified || results[0];
 
-  const impl = best.attributes?.implementations?.[0];
+  // Find the implementation for the specific chain we are on
+  const impl = (best.attributes?.implementations || []).find(
+    (i) => i.chain_id === chainId
+  ) || best.attributes?.implementations?.[0];
 
   return {
     fungibleId: best.id,
