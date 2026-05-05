@@ -46,9 +46,11 @@ export async function getSwapQuote({
     sort: "amount",
   };
 
-  // Skip input[from] for Solana to bypass the API's hardcoded EVM validator.
-  // The aggregator doesn't need the wallet for a quote; it's only needed for signing.
-  if (fromChain !== "solana") {
+  // For Solana, we use the CAIP-10 prefix to definitively signal the chain to the API validator.
+  // This allows us to provide the wallet address (needed for routing) without triggering the EVM error.
+  if (fromChain === "solana") {
+    params["input[from]"] = `solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp:${walletAddress}`;
+  } else {
     params["input[from]"] = walletAddress;
   }
 
