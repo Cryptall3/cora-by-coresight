@@ -29,11 +29,11 @@ async function simulateAlpha() {
 
     // Parse the CHIMP data into the expected format
     const mockToken = {
-      symbol: 'USDUM',
+      symbol: 'USDC',
       name: 'USD Coin',
-      mint: '7p9E5VH96sXw4jAZrGErF58mLDJhuof1ggtHTeHQpump',
+      mint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
       marketCap: 1000000000,
-      liquidity: 5200,
+      liquidity: 1000000,
       buy_amount: 0.018,
       holders: 100000,
       lpBurn: 100,

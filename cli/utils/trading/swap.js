@@ -44,15 +44,28 @@ export async function getSwapQuote({
     "input[fungible_id]": fromResolved.fungibleId === "sol" ? "11111111111111111111111111111111" : fromResolved.fungibleId,
     "input[amount]": amount.toString(), // Human-readable decimal
     "output[chain_id]": toChain || fromChain,
-    "output[fungible_id]": toResolved.address || toResolved.fungibleId,
+    "output[fungible_id]": toResolved.fungibleId === "sol" ? "11111111111111111111111111111111" : toResolved.fungibleId,
     "slippage_percent": Math.min(slippage ?? getConfigValue("slippage") ?? DEFAULT_SLIPPAGE, 3.0),
     currency: "usd"
   };
 
   console.log('📡 [ZERION REQUEST PARAMS]:', JSON.stringify(params, null, 2));
-  const response = await api.fetchAPI("/swap/quotes/", params);
-  console.log('📡 [ZERION RAW RESPONSE]:', JSON.stringify(response, null, 2));
   
+  let response;
+  try {
+    response = await api.fetchAPI("/swap/quotes/", params);
+  } catch (error) {
+    // If the token is not swappable (e.g. low liquidity pump.fun tokens), Zerion returns a 400 Malformed error
+    console.log('❌ [ZERION API ERROR]:', error.message);
+    const err = new Error(
+      `No swap route found for ${amount} ${fromToken} → ${toToken} on ${fromChain}. Token may not be indexed or lacks liquidity.`
+    );
+    err.code = "no_route";
+    throw err;
+  }
+  
+  console.log('📡 [ZERION RAW RESPONSE]:', JSON.stringify(response, null, 2));
+
   // The quotes endpoint returns a slightly different structure (data array of containers)
   const offers = response.data || [];
   if (offers.length === 0) {
