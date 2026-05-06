@@ -45,8 +45,18 @@ export async function signAndBroadcastSolana(swapTxData, walletName, passphrase)
     // Sign with OWS — pass the raw tx bytes as hex for OWS to sign
     const signResult = ows.signSolanaTransaction(walletName, txData, passphrase);
 
-    // OWS returns the fully signed transaction
-    signedTxBytes = Buffer.from(signResult.signature, "hex");
+    const signatureBytes = Buffer.from(signResult.signature, "hex");
+
+    if (rawBase64) {
+      // The v1 Quotes API returns a serialized transaction with dummy signature bytes
+      // The first byte is the number of signatures, the next 64 bytes are the fee payer's signature
+      const txBuf = Buffer.from(rawBase64, 'base64');
+      signatureBytes.copy(txBuf, 1);
+      signedTxBytes = txBuf;
+    } else {
+      // Legacy handling
+      signedTxBytes = signatureBytes;
+    }
   } catch (err) {
     throw new Error(`Failed to sign Solana transaction: ${err.message}`);
   }
