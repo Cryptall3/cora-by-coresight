@@ -80,10 +80,10 @@ export class UserService {
             const expiresAt = new Date();
             expiresAt.setFullYear(expiresAt.getFullYear() + 1);
             // We create a token with a name matching the wallet, OWS will overwrite/save it in its local keys.json
-            keystore.createAgentToken(`cora-tk-${w.id}-restored`, w.walletName, passphrase, Math.floor(expiresAt.getTime() / 1000).toString());
+            keystore.createAgentToken(`cora-tk-${w.id}-restored`, w.walletName, passphrase, expiresAt.toISOString());
             // Note: Since we are generating a NEW agent token on restore, we should probably use THIS token for execution.
             // But since TradeExecutor pulls it from the database, let's update the DB to match the newly generated token.
-            const newToken = keystore.createAgentToken(`cora-tk-${w.id}`, w.walletName, passphrase, Math.floor(expiresAt.getTime() / 1000).toString());
+            const newToken = keystore.createAgentToken(`cora-tk-${w.id}`, w.walletName, passphrase, expiresAt.toISOString());
             await collection.updateOne(
               { userId, "wallets.id": w.id },
               { $set: { "wallets.$.agentToken": newToken.token } }
@@ -119,7 +119,7 @@ export class UserService {
     // Create Agent Token for this specific wallet
     const expiresAt = new Date();
     expiresAt.setFullYear(expiresAt.getFullYear() + 1);
-    const agentToken = keystore.createAgentToken(`cora-tk-${walletId}`, walletName, passphrase, Math.floor(expiresAt.getTime() / 1000).toString());
+    const agentToken = keystore.createAgentToken(`cora-tk-${walletId}`, walletName, passphrase, expiresAt.toISOString());
 
     const newWallet = {
       id: walletId,
