@@ -26,8 +26,15 @@ function getConnection() {
 export async function signAndBroadcastSolana(swapTxData, walletName, passphrase) {
   const connection = getConnection();
 
-  // The Zerion swap API returns Solana tx as hex in the transaction.data field
-  const txData = swapTxData.data;
+  // The v1 Quotes API returns Solana tx as base64 in the 'raw' field.
+  // The legacy Offers API returns it as hex in the 'data' field.
+  const rawBase64 = swapTxData.raw;
+  let txData = swapTxData.data;
+
+  if (rawBase64) {
+    txData = Buffer.from(rawBase64, 'base64').toString('hex');
+  }
+
   if (!txData) {
     throw new Error("No transaction data from swap API for Solana");
   }
