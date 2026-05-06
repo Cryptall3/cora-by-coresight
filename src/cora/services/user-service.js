@@ -73,6 +73,22 @@ export class UserService {
           const mnemonic = decrypt(w.encryptedMnemonic, serverSecret);
           const passphrase = crypto.createHmac('sha256', serverSecret).update(userId.toString() + w.id).digest('hex');
           keystore.importFromMnemonic(w.walletName, mnemonic, passphrase);
+          
+          // CRITICAL FIX: Recreate the agent token locally so OWS recognizes it on ephemeral deployments
+          if (w.agentToken) {
+            console.log(`📡 [USER SERVICE] Restoring agent token for ${w.name}...`);
+            const expiresAt = new Date();
+            expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+            // We create a token with a name matching the wallet, OWS will overwrite/save it in its local keys.json
+            keystore.createAgentToken(`cora-tk-${w.id}-restored`, w.walletName, passphrase, Math.floor(expiresAt.getTime() / 1000).toString());
+            // Note: Since we are generating a NEW agent token on restore, we should probably use THIS token for execution.
+            // But since TradeExecutor pulls it from the database, let's update the DB to match the newly generated token.
+            const newToken = keystore.createAgentToken(`cora-tk-${w.id}`, w.walletName, passphrase, Math.floor(expiresAt.getTime() / 1000).toString());
+            await collection.updateOne(
+              { userId, "wallets.id": w.id },
+              { $set: { "wallets.$.agentToken": newToken.token } }
+            );
+          }
         }
       }
 
