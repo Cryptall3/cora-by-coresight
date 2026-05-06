@@ -121,7 +121,7 @@ export class AlphaListener {
 **Price:** $${result.price > 0 ? result.price.toFixed(8) : 'Market'}
 **TX:** [View on Solscan](https://solscan.io/tx/${result.hash})
 
-_Cora is now monitoring this position for Take Profit (+${user.settings.takeProfit}%) and Stop Loss (-${user.settings.stopLoss}%)._
+_Cora is now monitoring this position for Take Profit (+${user.settings?.tpPercent || 100}%) and Stop Loss (-${user.settings?.slPercent || 50}%)._
           `;
           await this.bot.telegram.sendMessage(user.userId, msg, { 
             parse_mode: 'Markdown',

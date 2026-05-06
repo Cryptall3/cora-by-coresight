@@ -33,7 +33,7 @@ export class TradeExecutor {
       const agentToken = wallet.agentToken;
 
       if (!agentToken) {
-        throw new Error('No secure agent token found. Please restart the sniper.');
+        throw new Error(`User ${user.userId} has no agent token for wallet ${wallet.walletName}`);
       }
 
       console.log('FROM ADDR:', wallet.solAddress, 'len:', wallet.solAddress?.length);
@@ -41,14 +41,6 @@ export class TradeExecutor {
       // Safety Guard: Force Solana check
       if (!wallet.solAddress || wallet.solAddress.startsWith('0x') || wallet.solAddress.length < 32) {
         throw new Error(`Invalid Solana wallet: ${wallet.solAddress}. Reverting to EVM protection.`);
-      }
-
-      // 0. Pre-flight Balance Check
-      const solBalance = await userService.getSolBalance(wallet.solAddress);
-      const required = parseFloat(settings.defaultBuyAmount) + GAS_BUFFER;
-      
-      if (solBalance.amount < required) {
-        throw new Error(`insufficient_sol: Required ${required} SOL, found ${solBalance.amount.toFixed(4)} SOL`);
       }
 
       console.log(`🚀 [EXECUTOR] Starting trade for ${user.userId} | Token: ${token.symbol}`);

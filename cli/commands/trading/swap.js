@@ -62,7 +62,7 @@ export default async function swap(args, flags) {
         minOutput: quote.outputMin,
         fee: quote.fee,
         source: quote.liquiditySource,
-        estimatedTime: `${quote.estimatedSeconds}s`,
+        estimatedTime: quote.estimatedSeconds ? `${quote.estimatedSeconds}s` : 'N/A',
         fromChain,
         toChain: isCrossChain ? toChain : undefined,
         chain: isCrossChain ? `${fromChain} → ${toChain}` : fromChain,
