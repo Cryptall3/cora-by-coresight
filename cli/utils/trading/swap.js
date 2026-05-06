@@ -41,7 +41,7 @@ export async function getSwapQuote({
     from: walletAddress,
     to: walletAddress,
     "input[chain_id]": fromChain,
-    "input[fungible_id]": fromResolved.fungibleId,
+    "input[fungible_id]": fromResolved.fungibleId === "sol" ? "solana" : fromResolved.fungibleId,
     "input[amount]": amount.toString(), // Human-readable decimal
     "output[chain_id]": toChain || fromChain,
     "output[fungible_id]": toResolved.address || toResolved.fungibleId,
