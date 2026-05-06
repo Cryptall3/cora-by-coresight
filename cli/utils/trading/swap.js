@@ -35,39 +35,27 @@ export async function getSwapQuote({
   const amountInSmallestUnits = parseUnits(amount, fromResolved.decimals).toString();
 
   // Zerion v1 Swap API limits slippage to 3.0% max. Higher values cause validation errors.
-  const cappedSlippage = Math.min(slippage ?? getConfigValue("slippage") ?? DEFAULT_SLIPPAGE, 3.0);
-
+  // Use the modern /v1/swap/quotes/ endpoint discovered in the docs
+  // This endpoint handles Solana Base58 natively and uses human-readable amounts
   const params = {
+    from: walletAddress,
+    to: walletAddress,
     "input[chain_id]": fromChain,
     "input[fungible_id]": fromResolved.fungibleId,
-    "input[amount]": amountInSmallestUnits,
+    "input[amount]": amount.toString(), // Human-readable decimal
     "output[chain_id]": toChain || fromChain,
-    "slippage_percent": cappedSlippage,
-    sort: "amount",
+    "output[fungible_id]": toResolved.address || toResolved.fungibleId,
+    "slippage_percent": Math.min(slippage ?? getConfigValue("slippage") ?? DEFAULT_SLIPPAGE, 3.0),
+    currency: "usd"
   };
 
-  // For Solana, we use the CAIP-10 prefix to definitively signal the chain to the API validator.
-  // This allows us to provide the wallet address (needed for routing) without triggering the EVM error.
-  if (fromChain === "solana") {
-    params["input[from]"] = `solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp:${walletAddress}`;
-  } else {
-    params["input[from]"] = walletAddress;
-  }
-
-  // For Solana SPL tokens, use asset_address (mint) for better chain resolution
-  if (toResolved.address && fromChain === "solana") {
-    params["output[asset_address]"] = toResolved.address;
-  } else {
-    params["output[fungible_id]"] = toResolved.fungibleId;
-  }
-
-  const response = await api.getSwapOffers(params);
+  const response = await api.fetchAPI("/swap/quotes/", params);
+  
+  // The quotes endpoint returns a slightly different structure (data array of containers)
   const offers = response.data || [];
-
   if (offers.length === 0) {
     const err = new Error(
-      `No swap route found for ${amount} ${fromResolved.symbol} → ${toResolved.symbol} on ${fromChain}. ` +
-      `Minimum swap is ~$1. ` +
+      `No swap route found for ${amount} ${fromToken} → ${toToken} on ${fromChain}. ` +
       `Check your balance and chain with: zerion portfolio`
     );
     err.code = "no_route";
