@@ -41,7 +41,7 @@ export async function getSwapQuote({
     from: walletAddress,
     to: walletAddress,
     "input[chain_id]": fromChain,
-    "input[fungible_id]": fromResolved.fungibleId === "sol" ? "solana" : fromResolved.fungibleId,
+    "input[fungible_id]": fromResolved.fungibleId === "sol" ? "So11111111111111111111111111111111111111112" : fromResolved.fungibleId,
     "input[amount]": amount.toString(), // Human-readable decimal
     "output[chain_id]": toChain || fromChain,
     "output[fungible_id]": toResolved.address || toResolved.fungibleId,
@@ -49,7 +49,9 @@ export async function getSwapQuote({
     currency: "usd"
   };
 
+  console.log('📡 [ZERION REQUEST PARAMS]:', JSON.stringify(params, null, 2));
   const response = await api.fetchAPI("/swap/quotes/", params);
+  console.log('📡 [ZERION RAW RESPONSE]:', JSON.stringify(response, null, 2));
   
   // The quotes endpoint returns a slightly different structure (data array of containers)
   const offers = response.data || [];
