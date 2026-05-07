@@ -83,12 +83,16 @@ export async function getPortfolio(address, options = {}) {
 
 export async function getPositions(address, options = {}) {
   const params = {
-    "filter[positions]": options.positionFilter || "no_filter",
     currency: "usd",
     sort: "value",
   };
-  if (options.chainId) params["filter[chain_ids]"] = options.chainId;
-  return fetchAPI(`/wallets/${encodeURIComponent(address)}/positions`, params, options.auth);
+  
+  if (options.chainId !== 'solana') {
+    params["filter[positions]"] = options.positionFilter || "no_filter";
+    if (options.chainId) params["filter[chain_ids]"] = options.chainId;
+  }
+  
+  return fetchAPI(`/wallets/${encodeURIComponent(address)}/positions/`, params, options.auth);
 }
 
 export async function getPnl(address, options = {}) {
