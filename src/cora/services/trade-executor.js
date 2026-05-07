@@ -36,23 +36,25 @@ export class TradeExecutor {
       }
 
       console.log(`🚀 [EXECUTOR] Starting Raptor Snipe | User: ${user.userId} | Token: ${token.symbol}`);
+      console.log(`⚙️ [SETTINGS] Buy: ${settings.defaultBuyAmount} SOL | Slippage: ${settings.slippage} | Wallet: ${wallet.solAddress}`);
 
       // 1. Get Quote and Swap Transaction from Solana Tracker (Raptor)
       const SOL_MINT = "So11111111111111111111111111111111111111112";
       const amountLamports = Math.floor(settings.defaultBuyAmount * 1e9); // Convert SOL to lamports
       
+      console.log(`📡 [RAPTOR-REQ] Fetching quote for ${amountLamports} lamports...`);
       const raptorResult = await solanaTracker.quoteAndSwap({
         userPublicKey: wallet.solAddress,
         inputMint: SOL_MINT,
         outputMint: token.mint,
         amount: amountLamports,
-        slippage: settings.slippage || 3.0, // Uses full user-defined slippage
-        priorityFee: "high", // Sniper mode!
-        feeAccount: process.env.TREASURY_ADDRESS, // Platform fee recipient
-        feeBps: process.env.TREASURY_ADDRESS ? 100 : 0 // 1% fee if treasury set
+        slippage: settings.slippage || 'auto', 
+        priorityFee: "high", 
+        feeAccount: process.env.TREASURY_ADDRESS,
+        feeBps: process.env.TREASURY_ADDRESS ? 100 : 0
       });
 
-      console.log(`📡 [RAPTOR-QUOTE] Est. ${token.symbol} Out: ${raptorResult.quote.amountOut / 1e6}`);
+      console.log(`📡 [RAPTOR-QUOTE] Est. Out: ${raptorResult.quote.amountOut / 1e6} | Impact: ${raptorResult.quote.priceImpact}%`);
 
       // 2. Sign and Send via Yellowstone Jet TPU
       // Compute the deterministic passphrase used by OWS to decrypt the local wallet file
@@ -68,30 +70,29 @@ export class TradeExecutor {
       // 3. Confirm Transaction Status On-Chain
       console.log(`⏳ [EXECUTOR] Tx broadcasted (${result.hash}). Verifying on-chain status...`);
       let txConfirmed = false;
-      let txSuccess = false;
-      for (let i = 0; i < 15; i++) { // Poll every 2s for 30s
+      let txStatusData = null;
+      for (let i = 0; i < 15; i++) {
         await new Promise(r => setTimeout(r, 2000));
         try {
-          const statusResult = await solanaTracker.getTransactionStatus(result.hash);
-          if (statusResult.status !== "pending") {
+          txStatusData = await solanaTracker.getTransactionStatus(result.hash);
+          console.log(`🔍 [STATUS-POLL] Attempt ${i+1}: ${txStatusData.status}`);
+          if (txStatusData.status !== "pending") {
             txConfirmed = true;
-            if (statusResult.status === "failed" || statusResult.error || (statusResult.meta && statusResult.meta.err)) {
-              txSuccess = false;
-            } else {
-              txSuccess = true;
-            }
             break;
           }
-        } catch (e) {
-          // Ignore transient API errors while polling
-        }
+        } catch (e) {}
       }
+
+      console.log(`📊 [FULL-STATUS] ${JSON.stringify(txStatusData, null, 2)}`);
 
       if (!txConfirmed) {
         throw new Error("Transaction verification timed out. It may have been dropped.");
       }
-      if (!txSuccess) {
-        throw new Error("Transaction reverted on-chain (likely Slippage Exceeded).");
+
+      const hasError = txStatusData.status === "failed" || txStatusData.error || (txStatusData.meta && txStatusData.meta.err);
+      if (hasError) {
+        const errorMsg = txStatusData.error || (txStatusData.meta && JSON.stringify(txStatusData.meta.err)) || "Unknown Revert";
+        throw new Error(`Transaction reverted on-chain: ${errorMsg}`);
       }
 
       console.log(`✅ [TRADE] Confirmed On-Chain! TX: ${result.hash}`);

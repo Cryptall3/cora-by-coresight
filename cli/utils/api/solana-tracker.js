@@ -31,6 +31,8 @@ export async function quoteAndSwap({
     wrapUnwrapSol: true,
   };
 
+  console.log(`📡 [RAPTOR-DEBUG] Request Body: ${JSON.stringify(body)}`);
+
   if (feeAccount && feeBps > 0) {
     body.feeAccount = feeAccount;
     body.feeBps = feeBps;
