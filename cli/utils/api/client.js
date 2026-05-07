@@ -15,25 +15,18 @@ export async function fetchAPI(pathname, params = {}, auth) {
 
   const url = new URL(`${API_BASE}${pathname}`);
   
-  // SPECIAL HANDLING FOR ZERION SWAP API: 
-  // Brackets [ ] in parameter names must NOT be URL-encoded for Solana/SVM 
+  // SPECIAL HANDLING FOR ZERION API: 
+  // Brackets [ ] in parameter names must NOT be URL-encoded for 
   // validation to work correctly. URLSearchParams automatically encodes them.
-  let queryString = '';
-  const entries = Object.entries(params).filter(([_, v]) => v !== undefined && v !== null && v !== "");
-  
-  if (pathname.startsWith('/swap/')) {
-    queryString = Object.entries(params)
-      .filter(([_, v]) => v !== undefined && v !== null && v !== "")
-      .map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`)
-      .join('&');
-      
+  const queryString = Object.entries(params)
+    .filter(([_, v]) => v !== undefined && v !== null && v !== "")
+    .map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`)
+    .join('&');
+    
+  if (queryString) {
     url.search = `?${queryString}`;
-    console.log(`📡 [ZERION SWAP API] ${url.href}`);
-  } else {
-    for (const [key, value] of entries) {
-      url.searchParams.set(key, String(value));
-    }
   }
+
 
   const headers = { 
     Accept: "application/json"
@@ -95,7 +88,7 @@ export async function getPositions(address, options = {}) {
     sort: "value",
   };
   if (options.chainId) params["filter[chain_ids]"] = options.chainId;
-  return fetchAPI(`/wallets/${encodeURIComponent(address)}/positions/`, params, options.auth);
+  return fetchAPI(`/wallets/${encodeURIComponent(address)}/positions`, params, options.auth);
 }
 
 export async function getPnl(address, options = {}) {
