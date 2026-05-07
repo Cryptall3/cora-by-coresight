@@ -27,7 +27,7 @@ export async function quoteAndSwap({
     outputMint,
     amount: parseInt(amount.toString()), // Must be lamports (integer)
     slippageBps: (slippage === 'auto' || !slippage) ? "dynamic" : (parseFloat(slippage) * 100).toString(),
-    txVersion: "v0", // Following Raptor docs
+    txVersion: "V0", // Must be uppercase 'V0' for Solana Tracker API
     priorityFee,
     wrapUnwrapSol: true,
   };
