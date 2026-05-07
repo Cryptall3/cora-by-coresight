@@ -29,9 +29,9 @@ async function simulateAlpha() {
 
     // Parse the CHIMP data into the expected format
     const mockToken = {
-      symbol: 'TEST',
+      symbol: 'TEST_SNIPE',
       name: 'Test Token',
-      mint: 'GnTGvD3cTNf6SjAhtEUPAKubRkgzjkC8Et2q2BwPpump',
+      mint: 'CipCfJTUvfuoJzRHRKbWGDDtdkLiUwaf5xb9iyzXpump',
       marketCap: 10000,
       liquidity: 1000,
       buy_amount: 0.018,

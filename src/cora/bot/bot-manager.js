@@ -442,17 +442,32 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will m
         if (positions.length === 0) {
           msg = `📦 **Positions Hub**\n\n_No active positions found in this wallet._`;
         } else {
-          // Create buttons for each token (2 per row for better UX)
+          const db = await (await import('../db.js')).connectToDatabase();
+          
           for (let i = 0; i < positions.length; i += 2) {
             const row = [];
-            const p1 = positions[i];
-            const mint1 = p1.attributes.fungible_info.implementations.find(imm => imm.chain_id === 'solana')?.address;
-            row.push(Markup.button.callback(`$${p1.attributes.fungible_info.symbol}`, `manage_pos_${mint1}`));
             
+            const createButton = async (p) => {
+              const info = p.attributes.fungible_info;
+              const mint = info.implementations.find(imm => imm.chain_id === 'solana')?.address;
+              const trade = await db.collection('trades').findOne({ userId: ctx.from.id, mint, status: 'open' });
+              
+              let label = `$${info.symbol}`;
+              if (trade) {
+                const priceRes = await fetch(`https://api.solanatracker.io/price?tokenAddress=${mint}`).catch(() => null);
+                const priceData = priceRes ? await priceRes.json() : null;
+                const currentPrice = priceData?.price || 0;
+                if (currentPrice > 0) {
+                  const pnl = ((currentPrice - trade.buyPrice) / trade.buyPrice) * 100;
+                  label += ` ${pnl >= 0 ? '📈 +' : '📉 '}${pnl.toFixed(0)}%`;
+                }
+              }
+              return Markup.button.callback(label, `manage_pos_${mint}`);
+            };
+
+            row.push(await createButton(positions[i]));
             if (positions[i+1]) {
-              const p2 = positions[i+1];
-              const mint2 = p2.attributes.fungible_info.implementations.find(imm => imm.chain_id === 'solana')?.address;
-              row.push(Markup.button.callback(`$${p2.attributes.fungible_info.symbol}`, `manage_pos_${mint2}`));
+              row.push(await createButton(positions[i+1]));
             }
             buttons.push(row);
           }
@@ -524,6 +539,10 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will m
             [Markup.button.callback('🔄 Refresh Stats', `manage_pos_${mint}`)],
             [Markup.button.callback('⬅️ Back to Positions', 'positions_hub')]
           ])
+        }).catch(err => {
+          if (!err.message.includes('message is not modified')) {
+            throw err;
+          }
         });
       } catch (err) {
         console.error('❌ [BOT] Drill-down error:', err);

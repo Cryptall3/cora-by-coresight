@@ -29,7 +29,7 @@ export class AutoExitService {
         // 1. Check for open trades (TP/SL)
         const openTrades = await this.db.collection('trades').find({ status: 'open' }).toArray();
         if (openTrades.length > 0) {
-          console.log(`🔍 [AUTO-EXIT] Checking ${openTrades.length} open trades...`);
+          // Silent monitoring loop
           for (const trade of openTrades) {
             await this.checkTrade(trade);
           }
