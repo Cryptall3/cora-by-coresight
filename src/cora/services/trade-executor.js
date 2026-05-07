@@ -203,7 +203,7 @@ export class TradeExecutor {
       console.log(`✅ [SELL] Confirmed On-Chain! TX: ${result.hash}`);
       const solReceived = raptorResult.quote.amountOut / 1e9;
       const sellPrice = solReceived / balance; 
-      await this.recordExit(trade._id, sellPrice, 'closed', result.hash, solReceived);
+      await this.recordExit(user.userId, trade.mint, sellPrice, sellPercentage, result.hash, solReceived);
       return { success: true, hash: result.hash };
 
     } catch (error) {
@@ -277,23 +277,69 @@ export class TradeExecutor {
     return trade;
   }
 
-  async recordExit(tradeId, sellPrice, status, hash, solReceived = 0) {
-    const update = {
-      $set: {
-        status,
-        sellPrice,
-        sellHash: hash,
-        solReceived,
-        closedAt: new Date()
+  async recordExit(userId, mint, sellPrice, percentage, hash, solReceived = 0) {
+    const trades = await this.db.collection('trades').find({ userId, mint, status: 'open' }).toArray();
+    if (trades.length === 0) return;
+
+    let totalSpentSOL = 0;
+    let totalTokensReceived = 0;
+    trades.forEach(t => {
+      totalSpentSOL += t.buyAmount || 0;
+      totalTokensReceived += t.receivedAmount || (t.buyAmount / t.buyPrice);
+    });
+
+    const avgEntryPrice = totalSpentSOL / totalTokensReceived;
+    const tokensToSell = totalTokensReceived * (percentage / 100);
+    const profitPerToken = sellPrice - avgEntryPrice;
+    const realizedProfitSOL = tokensToSell * profitPerToken;
+
+    // Proportionally reduce each open trade
+    for (const trade of trades) {
+      const tradeReductionFactor = percentage / 100;
+      const soldFromThisTrade = trade.receivedAmount * tradeReductionFactor;
+      const solBasisFromThisTrade = trade.buyAmount * tradeReductionFactor;
+      
+      const newReceivedAmount = trade.receivedAmount - soldFromThisTrade;
+      const newBuyAmount = trade.buyAmount - solBasisFromThisTrade;
+
+      if (newReceivedAmount < 0.000001 || percentage === 100) {
+        // Close the trade entirely
+        await this.db.collection('trades').updateOne(
+          { _id: trade._id },
+          { 
+            $set: { 
+              status: 'closed',
+              sellPrice,
+              sellHash: hash,
+              solReceived: solReceived * (trade.receivedAmount / totalTokensReceived),
+              closedAt: new Date(),
+              pnl: ((sellPrice - trade.buyPrice) / trade.buyPrice) * 100
+            }
+          }
+        );
+      } else {
+        // Partial reduction
+        await this.db.collection('trades').updateOne(
+          { _id: trade._id },
+          { 
+            $set: { 
+              receivedAmount: newReceivedAmount,
+              buyAmount: newBuyAmount
+            },
+            $push: {
+              exits: {
+                percentage,
+                sellPrice,
+                solReceived: solReceived * (soldFromThisTrade / totalTokensReceived),
+                timestamp: new Date(),
+                hash
+              }
+            }
+          }
+        );
       }
-    };
-    
-    const trade = await this.db.collection('trades').findOne({ _id: tradeId });
-    if (trade && trade.buyPrice > 0 && sellPrice > 0) {
-      const pnlPercent = ((sellPrice - trade.buyPrice) / trade.buyPrice) * 100;
-      update.$set.pnl = pnlPercent;
     }
 
-    await this.db.collection('trades').updateOne({ _id: tradeId }, update);
+    console.log(`💰 [DCA-EXIT] ${percentage}% sold for ${mint} | Realized Profit: ${realizedProfitSOL.toFixed(4)} SOL`);
   }
 }
