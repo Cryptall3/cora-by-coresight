@@ -465,8 +465,10 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will m
               });
               
               const avgEntryPrice = totalSpentSOL / totalTokensReceived;
-              // FETCH PRICE ON-DEMAND (No background sync)
-              const priceRes = await fetch(`https://api.solanatracker.io/price?tokenAddress=${mint}`).catch(() => null);
+              // FETCH PRICE ON-DEMAND (Using correct production endpoint)
+              const priceRes = await fetch(`https://data.solanatracker.io/price?token=${mint}`, {
+                headers: { 'x-api-key': process.env.SOLANATRACKER_API_KEY }
+              }).catch(() => null);
               const priceData = priceRes ? await priceRes.json() : null;
               const currentPrice = priceData?.price || 0;
               
@@ -474,7 +476,7 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will m
                 const pnl = ((currentPrice - avgEntryPrice) / avgEntryPrice) * 100;
                 summary += `• <b>$${symbol}</b>: ${pnl >= 0 ? '📈 +' : '📉 '}${pnl.toFixed(1)}% (Avg: <code>${avgEntryPrice.toFixed(10)}</code>)\n`;
               } else {
-                summary += `• <b>$${symbol}</b>: ⚠️ Price Error\n`;
+                summary += `• <b>$${symbol}</b>: ⏳ Syncing...\n`;
               }
               
               return Markup.button.callback(`$${symbol}`, `manage_pos_${mint}`);
@@ -516,8 +518,10 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will m
         const response = await getPositions(wallet.solAddress, { chainId: 'solana' });
         const pos = response.data.find(p => p.attributes.fungible_info?.implementations?.some(i => i.address === mint));
         
-        // 2. Fetch Live Price On-Demand
-        const priceRes = await fetch(`https://api.solanatracker.io/price?tokenAddress=${mint}`).catch(() => null);
+        // 2. Fetch Live Price On-Demand (Correct Endpoint)
+        const priceRes = await fetch(`https://data.solanatracker.io/price?token=${mint}`, {
+          headers: { 'x-api-key': process.env.SOLANA_TRACKER_API_KEY }
+        }).catch(() => null);
         const priceData = priceRes ? await priceRes.json() : null;
         const currentPrice = priceData?.price || 0;
         

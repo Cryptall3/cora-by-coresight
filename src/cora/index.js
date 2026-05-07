@@ -1,3 +1,4 @@
+// Cora Autonomous Trader - Production Build
 import { BotManager } from './bot/bot-manager.js';
 import { AlphaListener } from './services/alpha-listener.js';
 import { AutoExitService } from './services/auto-exit-service.js';
