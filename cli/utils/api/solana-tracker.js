@@ -19,6 +19,7 @@ export async function quoteAndSwap({
   priorityFee = "high",
   feeAccount,
   feeBps = 0,
+  feeFromInput = false,
 }) {
   const body = {
     userPublicKey,
@@ -26,17 +27,18 @@ export async function quoteAndSwap({
     outputMint,
     amount: parseInt(amount.toString()), // Must be lamports (integer)
     slippageBps: (slippage === 'auto' || !slippage) ? "dynamic" : (parseFloat(slippage) * 100).toString(),
-    txVersion: "V0", // Must be uppercase 'V0' or 'LEGACY'
+    txVersion: "v0", // Following Raptor docs
     priorityFee,
     wrapUnwrapSol: true,
   };
 
-  console.log(`📡 [RAPTOR-DEBUG] Request Body: ${JSON.stringify(body)}`);
-
   if (feeAccount && feeBps > 0) {
     body.feeAccount = feeAccount;
     body.feeBps = feeBps;
+    body.feeFromInput = feeFromInput;
   }
+
+  console.log(`📡 [RAPTOR-DEBUG] Request Body: ${JSON.stringify(body)}`);
 
   const response = await fetch(`${RAPTOR_BASE_URL}/quote-and-swap`, {
     method: "POST",

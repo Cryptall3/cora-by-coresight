@@ -127,10 +127,11 @@ Cora has completed her mission window. New signals will not be sniped.
       const { tpPercent, slPercent } = profile.settings;
 
       // 2. Get Current Price
-      // Zerion fungibleId format for Solana is usually "solana:mintAddress"
-      const fungibleId = `solana:${trade.mint}`;
-      const tokenData = await getFungible(fungibleId);
-      const currentPrice = tokenData.data?.attributes?.market_data?.price || 0;
+      // 3. Calculate PnL
+      const buyPrice = trade.buyPrice;
+      const currentPrice = 0; // Price logic needs to be updated to ST or other
+      // For now, we rely on the DB stored metadata for the symbol/decimals
+      const pnlPercent = 0; // Temporary placeholder until price logic is moved
 
       if (currentPrice === 0) {
         console.warn(`⚠️ [AUTO-EXIT] Could not fetch price for ${trade.symbol}`);

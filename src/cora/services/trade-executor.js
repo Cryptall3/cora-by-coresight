@@ -38,22 +38,22 @@ export class TradeExecutor {
       console.log(`🚀 [EXECUTOR] Starting Raptor Snipe | User: ${user.userId} | Token: ${token.symbol}`);
       console.log(`⚙️ [SETTINGS] Buy: ${settings.defaultBuyAmount} SOL | Slippage: ${settings.slippage} | Wallet: ${wallet.solAddress}`);
 
-      // 1. Get Quote and Swap Transaction from Solana Tracker V2 (More stable than Raptor Beta)
+      // 1. Get Quote and Swap Transaction from Solana Tracker
       const SOL_MINT = "So11111111111111111111111111111111111111112";
       const amountLamports = Math.floor(settings.defaultBuyAmount * 1e9); 
       
-      console.log(`📡 [EXECUTOR] Fetching V2 quote for ${amountLamports} lamports...`);
+      console.log(`📡 [EXECUTOR] Fetching Raptor quote with VERY HIGH priority and SOL fees...`);
       
-      // CLEAN SWAP TEST: Disabling feeAccount and feeBps to see if missing treasury ATA is causing reverts
       const raptorResult = await solanaTracker.quoteAndSwap({
         userPublicKey: wallet.solAddress,
         inputMint: SOL_MINT,
         outputMint: token.mint,
         amount: amountLamports,
         slippage: settings.slippage || 'auto', 
-        priorityFee: "high"
-        // feeAccount: process.env.TREASURY_ADDRESS, 
-        // feeBps: 100 
+        priorityFee: "veryHigh",
+        feeAccount: process.env.TREASURY_ADDRESS,
+        feeBps: 100, // 1% platform fee
+        feeFromInput: true // CRITICAL: Take fee in SOL to avoid ATA reverts
       });
 
       console.log(`📡 [RAPTOR-QUOTE] Est. Out: ${raptorResult.quote.amountOut / 1e6} | Impact: ${raptorResult.quote.priceImpact}%`);
@@ -146,13 +146,15 @@ export class TradeExecutor {
       const tokenInfo = await this.getTokenMetadata(trade.mint);
       const amountToSell = balance * (sellPercentage / 100);
       const rawAmount = Math.floor(amountToSell * Math.pow(10, tokenInfo.decimals || 6));
+      const slippage = user.settings.slippage;
 
       const raptorResult = await solanaTracker.quoteAndSwap({
         userPublicKey: wallet.solAddress,
         inputMint: trade.mint,
         outputMint: SOL_MINT,
         amount: rawAmount,
-        slippage: user.settings.slippage || 3.0,
+        slippageBps: (slippage === 'auto' || !slippage) ? "dynamic" : (parseFloat(slippage) * 100).toString(),
+        txVersion: "LEGACY",
         priorityFee: "medium",
         feeAccount: process.env.TREASURY_ADDRESS,
         feeBps: process.env.TREASURY_ADDRESS ? 100 : 0
@@ -227,26 +229,31 @@ export class TradeExecutor {
   async getTokenMetadata(mint) {
     try {
       const { getFungible } = await import('../../../cli/utils/api/client.js');
-      const response = await getFungible(`solana/${mint}`);
+      const response = await getFungible(`solana:${mint}`);
       return {
         decimals: response.data?.attributes?.implementations?.[0]?.decimals || 6,
         symbol: response.data?.attributes?.symbol || 'TOKEN'
       };
     } catch (error) {
+      // Silence log for unindexed new tokens to avoid spam
       return { decimals: 6, symbol: 'TOKEN' };
     }
   }
 
   async recordTrade(userId, token, quote, result, missionId = null) {
-    const meta = await this.getTokenMetadata(token.mint);
+    // Extract metadata directly from the Raptor quote if available
+    const decimals = quote.outputToken?.decimals || 6;
+    const symbol = quote.outputToken?.symbol || token.symbol;
+
     const trade = {
       userId,
       missionId,
       mint: token.mint,
-      symbol: token.symbol,
-      buyAmount: parseFloat(quote.amountIn) / 1e9, // SOL spent
-      buyPrice: token.price || 0, // Market price at detection
-      receivedAmount: parseFloat(quote.amountOut) / Math.pow(10, meta.decimals),
+      symbol: symbol,
+      decimals: decimals, // Store decimals so auto-exit doesn't need API calls
+      buyAmount: parseFloat(quote.amountIn) / 1e9, 
+      buyPrice: token.price || 0,
+      receivedAmount: parseFloat(quote.amountOut) / Math.pow(10, decimals),
       txHash: result.hash,
       timestamp: new Date(),
       status: 'open',
@@ -255,6 +262,7 @@ export class TradeExecutor {
     };
 
     await this.db.collection('trades').insertOne(trade);
+    console.log(`📝 [EXECUTOR] Trade recorded for ${symbol} (Decimals: ${decimals})`);
   }
 
   async recordExit(tradeId, sellPrice, status, hash, solReceived = 0) {
