@@ -52,11 +52,11 @@ export class BotManager {
       const profile = await userService.getProfile(ctx.from.id);
       const wallets = profile.wallets || [];
 
-      let msg = '💳 **Wallet Manager**\n\nManage your trading capital across multiple accounts:\n\n';
+      let msg = '💳 <b>Wallet Manager</b>\n\nManage your trading capital across multiple accounts:\n\n';
       const buttons = [];
 
       wallets.forEach((w, index) => {
-        msg += `${index + 1}. **${w.name}**\n\`${w.solAddress}\`\n\n`;
+        msg += `<b>${index + 1}. ${w.name}</b>\n<code>${w.solAddress}</code>\n\n`;
         buttons.push([Markup.button.callback(`⚙️ Manage: ${w.name}`, `manage_wallet_${w.id}`)]);
       });
 
@@ -64,7 +64,7 @@ export class BotManager {
       buttons.push([Markup.button.callback('⬅️ Back', 'main_menu')]);
 
       ctx.editMessageText(msg, {
-        parse_mode: 'Markdown',
+        parse_mode: 'HTML',
         ...Markup.inlineKeyboard(buttons)
       });
     });
@@ -447,7 +447,7 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will m
         const buttons = [];
 
         if (positions.length === 0) {
-          msg = `📦 **Positions Hub**\n\n_No active positions found in this wallet._`;
+          msg = `📦 <b>Positions Hub</b>\n\n<i>No active positions found in this wallet.</i>`;
         } else {
           const db = await (await import('../db.js')).connectToDatabase();
           let summary = '';

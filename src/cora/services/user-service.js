@@ -300,24 +300,39 @@ export class UserService {
    * Fetch SOL balance and USD value for a specific address using Zerion API.
    */
   /**
-   * Fetch total portfolio value from Zerion (Fungibles only)
+   * Fetch total portfolio value (Real-time SOL + Zerion Tokens)
    */
   async getPortfolioValue(solAddress) {
     try {
       const apiKey = process.env.ZERION_API_KEY;
       const auth = Buffer.from(`${apiKey}:`).toString('base64');
       
-      // Use sync=true to force Zerion to refresh its data
-      const res = await fetch(`https://api.zerion.io/v1/wallets/${solAddress}/portfolio?currency=usd&sync=true`, {
+      // 1. Get real-time SOL USD value from our on-chain method
+      const realSol = await this.getSolBalance(solAddress);
+      
+      // 2. Get individual positions from Zerion
+      const res = await fetch(`https://api.zerion.io/v1/wallets/${solAddress}/positions?currency=usd&filter[positions]=only_simple`, {
         headers: { 'Authorization': `Basic ${auth}` }
       });
       
-      if (!res.ok) return 0;
+      if (!res.ok) return realSol.usdValue;
       
       const data = await res.json();
-      return data?.data?.attributes?.total?.positions || 0;
+      const positions = data.data || [];
+      
+      // 3. Sum up all tokens EXCEPT SOL (to avoid double counting stale data)
+      let tokenValue = 0;
+      for (const pos of positions) {
+        const symbol = pos.attributes?.fungible_info?.symbol;
+        if (symbol !== 'SOL') {
+          tokenValue += pos.attributes?.value || 0;
+        }
+      }
+      
+      // 4. Total = Real SOL + Stored Tokens
+      return realSol.usdValue + tokenValue;
     } catch (err) {
-      console.error('❌ [USER SERVICE] Error fetching portfolio:', err);
+      console.error('❌ [USER SERVICE] Error calculating portfolio:', err);
       return 0;
     }
   }
