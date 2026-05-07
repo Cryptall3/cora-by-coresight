@@ -503,6 +503,16 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will m
         }
 
         buttons.push([Markup.button.callback('🔄 Refresh List', 'positions_hub')]);
+        buttons.push([Markup.button.callback('⬅️ Back to Hub', 'main_menu')]);
+
+        ctx.editMessageText(msg, {
+          parse_mode: 'HTML',
+          ...Markup.inlineKeyboard(buttons)
+        });
+      } catch (err) {
+        console.error('❌ [BOT] Positions Hub Error:', err);
+        ctx.reply('⚠️ Error loading your positions.');
+      }
     });
 
     this.bot.action(/^manage_pos_(.+)$/, async (ctx) => {
