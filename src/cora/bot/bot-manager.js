@@ -482,7 +482,8 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will m
               
               if (trades.length > 0 && currentPriceSOL > 0) {
                 const pnl = ((currentPriceSOL - avgEntryPrice) / avgEntryPrice) * 100;
-                summary += `• <b>$${symbol}</b>: ${pnl >= 0 ? '📈 +' : '📉 '}${pnl.toFixed(1)}% (Avg: <code>${avgEntryPrice.toFixed(10)}</code>)\n`;
+                const avgMC = avgEntryPrice * solPriceUSD * 1000000000;
+                summary += `• <b>$${symbol}</b>: ${pnl >= 0 ? '📈 +' : '📉 '}${pnl.toFixed(1)}% (Avg MC: <b>$${formatMCap(avgMC)}</b>)\n`;
               } else {
                 summary += `• <b>$${symbol}</b>: ⏳ Syncing...\n`;
               }
@@ -498,7 +499,7 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will m
           }
           
           if (summary) {
-            msg = `📦 **Positions Hub**\n_Wallet: ${wallet.solAddress.slice(0,6)}...${wallet.solAddress.slice(-4)}_\n\n${summary}\nSelect a token to manage:`;
+            msg = `📦 <b>Positions Hub</b>\n<i>Wallet: ${wallet.solAddress.slice(0,6)}...${wallet.solAddress.slice(-4)}</i>\n\n${summary}\nSelect a token to manage:`;
           }
         }
 
@@ -540,6 +541,7 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will m
         const solPriceUSD = solData?.price || 150;
         const currentPriceUSD = priceData?.price || 0;
         const currentPriceSOL = currentPriceUSD / solPriceUSD;
+        const currentMCap = priceData?.marketCap || 0;
         
         // 3. Calculate Weighted Average from Database
         const { connectToDatabase } = await import('../db.js');
@@ -554,8 +556,7 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will m
         });
         
         const avgEntryPrice = totalSpentSOL / totalTokensReceived;
-        const initialMCap = avgEntryPrice * 1000000000;
-        const currentMCap = currentPriceSOL * 1000000000;
+        const avgMCap = avgEntryPrice * solPriceUSD * 1000000000;
 
         const info = pos?.attributes?.fungible_info || { symbol: 'TOKEN', name: 'Unknown Token' };
         const quantity = pos?.attributes?.quantity?.float || 0;
@@ -575,25 +576,24 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will m
         };
 
         const msg = `
-💎 **Position: ${info.name} ($${info.symbol})**
-\`${mint}\`
+💎 <b>Position: ${info.name} ($${info.symbol})</b>
+<code>${mint}</code>
 
-**📊 Performance:**
-• PnL: **${pnlStr}**
-• Current Value: \`$${currentValue.toFixed(2)}\`
-• Holding: \`${quantity.toFixed(4)} ${info.symbol}\`
+<b>📊 Performance:</b>
+• PnL: <b>${pnlStr}</b>
+• Current Value: <code>$${currentValue.toFixed(2)}</code>
+• Holding: <code>${quantity.toFixed(4)} ${info.symbol}</code>
 
-**📈 Trade Entry:**
-• Entry Price: \`$${avgEntryPrice.toFixed(10)} SOL\`
-• Entry SOL: \`${totalSpentSOL.toFixed(3)} SOL\`
-• Initial MCap: \`$${formatMCap(initialMCap)}\`
-• Live MCap: \`$${formatMCap(currentMCap)}\`
+<b>📈 Trade Entry:</b>
+• Avg MC: <b>$${formatMCap(avgMCap)}</b>
+• Entry SOL: <code>${totalSpentSOL.toFixed(3)} SOL</code>
+• Current MC: <b>$${formatMCap(currentMCap)}</b>
 
-**Status:** ⏳ **MONITORING**
+<b>Status:</b> ⏳ <b>MONITORING</b>
         `;
 
         ctx.editMessageText(msg, {
-          parse_mode: 'Markdown',
+          parse_mode: 'HTML',
           ...Markup.inlineKeyboard([
             [Markup.button.callback('➕ Buy More', `pos_buy_menu_${mint}`), Markup.button.callback('🔴 Sell Position', `pos_sell_menu_${mint}`)],
             [Markup.button.callback('🔄 Refresh Stats', `manage_pos_${mint}`)],
