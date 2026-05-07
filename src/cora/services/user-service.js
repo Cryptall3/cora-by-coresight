@@ -307,7 +307,8 @@ export class UserService {
       const apiKey = process.env.ZERION_API_KEY;
       const auth = Buffer.from(`${apiKey}:`).toString('base64');
       
-      const res = await fetch(`https://api.zerion.io/v1/wallets/${solAddress}/portfolio?currency=usd`, {
+      // Use sync=true to force Zerion to refresh its data
+      const res = await fetch(`https://api.zerion.io/v1/wallets/${solAddress}/portfolio?currency=usd&sync=true`, {
         headers: { 'Authorization': `Basic ${auth}` }
       });
       
@@ -321,24 +322,32 @@ export class UserService {
     }
   }
 
+  /**
+   * Fetch real-time SOL balance directly from the blockchain (RPC)
+   */
   async getSolBalance(address) {
     try {
-      const { getPositions } = await import('../../../cli/utils/api/client.js');
-      const response = await getPositions(address, { 
-        chainId: 'solana',
-        positionFilter: 'only_simple'
-      });
-
-      const solPosition = (response.data || []).find(
-        p => p.attributes.fungible_info?.symbol === 'SOL'
-      );
-
+      const connection = new Connection(process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com");
+      const pubkey = new PublicKey(address);
+      
+      // 1. Get real-time lamports from the blockchain
+      const lamports = await connection.getBalance(pubkey);
+      const amount = lamports / LAMPORTS_PER_SOL;
+      
+      // 2. Get SOL price from Solana Tracker for accurate USD conversion
+      const priceRes = await fetch('https://data.solanatracker.io/price?token=So11111111111111111111111111111111111111112', {
+        headers: { 'x-api-key': process.env.SOLANATRACKER_API_KEY }
+      }).catch(() => null);
+      
+      const priceData = priceRes ? await priceRes.json() : null;
+      const solPrice = priceData?.price || 150; // Fallback to 150 if API fails
+      
       return {
-        amount: solPosition?.attributes?.quantity?.float ?? 0,
-        usdValue: solPosition?.attributes?.value ?? 0
+        amount: amount,
+        usdValue: amount * solPrice
       };
     } catch (error) {
-      console.error('❌ [USER SERVICE] Balance fetch error:', error);
+      console.error('❌ [USER SERVICE] Error fetching real-time balance:', error);
       return { amount: 0, usdValue: 0 };
     }
   }
