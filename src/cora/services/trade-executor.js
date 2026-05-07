@@ -54,11 +54,19 @@ export class TradeExecutor {
       console.log(`📡 [RAPTOR-QUOTE] Est. ${token.symbol} Out: ${raptorResult.quote.amountOut / 1e6}`);
 
       // 2. Sign and Send via Yellowstone Jet TPU
-      const result = await signAndSendRaptorTransaction(
-        raptorResult.swapTransaction,
-        wallet.walletName,
-        null // Passphrase handled by keystore env resolution
-      );
+      // Inject the agent token into the environment for secure OWS signing
+      process.env.ZERION_AGENT_TOKEN = agentToken;
+      let result;
+      try {
+        result = await signAndSendRaptorTransaction(
+          raptorResult.swapTransaction,
+          wallet.walletName,
+          null // Passphrase handled by agent token
+        );
+      } finally {
+        // Always clean up the agent token
+        delete process.env.ZERION_AGENT_TOKEN;
+      }
 
       console.log(`✅ [TRADE] Success! TX: ${result.hash}`);
       
@@ -124,11 +132,17 @@ export class TradeExecutor {
       console.log(`📝 [RAPTOR-QUOTE] Found exit route for ${trade.symbol}. Est. SOL: ${raptorResult.quote.amountOut / 1e9}`);
 
       // 3. Sign and Send
-      const result = await signAndSendRaptorTransaction(
-        raptorResult.swapTransaction,
-        wallet.walletName,
-        null
-      );
+      process.env.ZERION_AGENT_TOKEN = agentToken;
+      let result;
+      try {
+        result = await signAndSendRaptorTransaction(
+          raptorResult.swapTransaction,
+          wallet.walletName,
+          null
+        );
+      } finally {
+        delete process.env.ZERION_AGENT_TOKEN;
+      }
 
       if (result.hash) {
         console.log(`✅ [SELL] Success! TX: ${result.hash}`);
