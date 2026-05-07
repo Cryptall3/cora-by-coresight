@@ -808,11 +808,11 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will m
       // 1. Check Subscription
       const access = await subService.checkAccess(userId);
       if (!access.hasAccess) {
-        const msg = `❌ **Access Denied**\n\nCora is an exclusive autonomous agent for Coresight Alpha members.\n\nPlease upgrade your plan to activate your personal trading agent.`;
+        const msg = `❌ <b>Access Denied</b>\n\nCora is an exclusive autonomous agent for Coresight Alpha members.\n\nPlease upgrade your plan to activate your personal trading agent.`;
         const kb = Markup.inlineKeyboard([
           [Markup.button.url('💎 Upgrade to Alpha', 'https://coresight.xyz/subscription')]
         ]);
-        return isEdit ? ctx.editMessageText(msg, { parse_mode: 'Markdown', ...kb }) : ctx.reply(msg, { parse_mode: 'Markdown', ...kb });
+        return isEdit ? ctx.editMessageText(msg, { parse_mode: 'HTML', ...kb }) : ctx.reply(msg, { parse_mode: 'HTML', ...kb });
       }
 
       // 2. Get Profile & Wallet
@@ -842,7 +842,7 @@ Use the menu below to fund your wallet, configure your tactics, and start snipin
       `;
 
       const extra = {
-        parse_mode: 'Markdown',
+        parse_mode: 'HTML',
         ...this.getMainMenu()
       };
 
