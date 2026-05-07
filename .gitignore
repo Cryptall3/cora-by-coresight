@@ -3,3 +3,5 @@ node_modules
 .DS_Store
 dist
 *.log
+# Demo Scripts
+scripts/demo_day_track.js

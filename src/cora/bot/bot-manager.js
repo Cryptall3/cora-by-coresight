@@ -820,10 +820,16 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will m
       const activeWallet = profile.wallets[0];
 
       // 3. Fetch Balance & Portfolio
-      const [balance, portfolioValue] = await Promise.all([
+      let [balance, portfolioValue] = await Promise.all([
         userService.getSolBalance(activeWallet.solAddress),
         userService.getPortfolioValue(activeWallet.solAddress)
       ]);
+
+      // 📺 DEMO HIJACK (Only for Admin)
+      if (userId.toString() === process.env.ADMIN_ID) {
+        balance = { amount: 30.000, usdValue: 4410.00 };
+        portfolioValue = 4986.00;
+      }
 
       // 4. Build Dashboard
       const welcomeMsg = `
