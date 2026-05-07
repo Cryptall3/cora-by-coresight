@@ -443,29 +443,6 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will m
           return info && info.symbol !== 'SOL' && p.attributes.quantity.float > 0.000001;
         });
 
-        // 📺 DEMO HIJACK: Add local trades to the display list
-        if (ctx.from.id.toString() === process.env.ADMIN_ID) {
-          const db = await (await import('../db.js')).connectToDatabase();
-          const openTrades = await db.collection('trades').find({ userId: ctx.from.id, status: 'open' }).toArray();
-          
-          openTrades.forEach(t => {
-            // Avoid duplicates if user actually owns it
-            if (!positions.some(p => p.attributes.fungible_info?.implementations?.some(i => i.address === t.mint))) {
-              positions.push({
-                attributes: {
-                  quantity: { float: 1.0 }, // Mock
-                  value: 0.99, // Mock
-                  fungible_info: {
-                    symbol: t.symbol,
-                    name: t.symbol,
-                    implementations: [{ chain_id: 'solana', address: t.mint }]
-                  }
-                }
-              });
-            }
-          });
-        }
-
         let msg = `📦 **Positions Hub**\n_Wallet: ${wallet.solAddress.slice(0,6)}...${wallet.solAddress.slice(-4)}_\n\nSelect a token to manage your position, view PnL, and see trade details:`;
         const buttons = [];
 
@@ -703,7 +680,10 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will m
       ctx.reply(`⏳ 📉 <b>Selling ${percentage}%...</b>`, { parse_mode: 'HTML' });
       
       const executor = this.executor;
-      const trade = { mint, symbol: 'TOKEN' };
+      const db = await (await import('../db.js')).connectToDatabase();
+      const tradeRecord = await db.collection('trades').findOne({ userId: ctx.from.id, mint, status: 'open' });
+      
+      const trade = { mint, symbol: tradeRecord?.symbol || 'TOKEN' };
       const result = await executor.executeSell(profile, trade, percentage);
 
       if (result.success) {
@@ -714,15 +694,28 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will m
         const priceData = priceRes ? await priceRes.json() : null;
         const sellMC = priceData?.marketCap || 0;
 
+        let profitMsg = '';
+        if (tradeRecord && result.solReceived) {
+          const buyAmount = parseFloat(tradeRecord.buyAmount);
+          const solProfit = result.solReceived - (buyAmount * (percentage / 100));
+          const pnlPercent = ((result.solReceived / (buyAmount * (percentage / 100))) - 1) * 100;
+          
+          profitMsg = `
+<b>Profit:</b> <code>${solProfit > 0 ? '+' : ''}${solProfit.toFixed(3)} SOL</code> ${solProfit > 0 ? '💎' : '📉'}
+<b>Returns:</b> <code>${pnlPercent > 0 ? '+' : ''}${pnlPercent.toFixed(1)}%</code>
+`;
+        }
+
         const msg = `
 🏁 <b>Alpha Sniper: Position Closed!</b>
 
 <b>Token:</b> $${trade.symbol}
 <b>Sold:</b> <code>${percentage}%</code>
+${profitMsg}
 <b>Sell MC:</b> <b>$${formatMCap(sellMC)}</b>
 <b>TX:</b> <a href="https://solscan.io/tx/${result.hash}">View on Solscan</a>
 
-<i>Position has been updated in your dashboard.</i>
+<i>Cora has successfully secured profits and updated your PnL Stats.</i>
         `;
         ctx.reply(msg, { parse_mode: 'HTML', disable_web_page_preview: true });
       } else {
@@ -843,16 +836,10 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will m
       const activeWallet = profile.wallets[0];
 
       // 3. Fetch Balance & Portfolio
-      let [balance, portfolioValue] = await Promise.all([
+      const [balance, portfolioValue] = await Promise.all([
         userService.getSolBalance(activeWallet.solAddress),
         userService.getPortfolioValue(activeWallet.solAddress)
       ]);
-
-      // 📺 DEMO HIJACK (Only for Admin)
-      if (userId.toString() === process.env.ADMIN_ID) {
-        balance = { amount: 30.000, usdValue: 4410.00 };
-        portfolioValue = 4986.00;
-      }
 
       // 4. Build Dashboard
       const welcomeMsg = `

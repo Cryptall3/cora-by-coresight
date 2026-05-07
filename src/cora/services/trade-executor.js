@@ -204,7 +204,7 @@ export class TradeExecutor {
       const solReceived = raptorResult.quote.amountOut / 1e9;
       const sellPrice = solReceived / balance; 
       await this.recordExit(user.userId, trade.mint, sellPrice, sellPercentage, result.hash, solReceived);
-      return { success: true, hash: result.hash };
+      return { success: true, hash: result.hash, solReceived, sellPrice };
 
     } catch (error) {
       console.error(`❌ [EXECUTOR] Raptor Sell failed for user ${user.userId}:`, error.message);
