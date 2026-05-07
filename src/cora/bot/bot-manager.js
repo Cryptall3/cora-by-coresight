@@ -2,6 +2,7 @@ import { Telegraf, Markup } from 'telegraf';
 import { SubscriptionService } from '../services/subscription-service.js';
 import { UserService } from '../services/user-service.js';
 import { TradeService } from '../services/trade-service.js';
+import { TradeExecutor } from '../services/trade-executor.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -14,10 +15,7 @@ export class BotManager {
   constructor() {
     this.bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
     this.userStates = new Map(); // For interactive prompts
-    this.executor = new (async () => {
-      const { TradeExecutor } = await import('../services/trade-executor.js');
-      return new TradeExecutor();
-    })() // Lazy load to avoid circular deps if any
+    this.executor = new TradeExecutor();
     this.setupHandlers();
   }
 
