@@ -24,6 +24,8 @@ export class PriceMonitorService {
   async run() {
     while (this.isRunning) {
       try {
+        const now = new Date();
+        
         // 1. Find all unique mints currently in "open" trades
         const activeTrades = await this.db.collection('trades').find({ status: 'open' }).toArray();
         const uniqueMints = [...new Set(activeTrades.map(t => t.mint))];
@@ -33,24 +35,54 @@ export class PriceMonitorService {
           continue;
         }
 
-        // 2. Fetch prices in bulk (or iterate if API is single-token)
-        // Solana Tracker Price API: We iterate for now, but use a high-speed endpoint
+        const mintsToPoll = [];
         for (const mint of uniqueMints) {
-          const priceRes = await fetch(`https://api.solanatracker.io/price?tokenAddress=${mint}`).catch(() => null);
-          const priceData = priceRes ? await priceRes.json() : null;
+          const cached = await this.db.collection('token_prices').findOne({ mint });
+          
+          if (!cached) {
+            mintsToPoll.push(mint);
+            continue;
+          }
 
-          if (priceData && priceData.price) {
-            // 3. Update Global Price Table
-            await this.db.collection('token_prices').updateOne(
-              { mint },
-              { 
+          const lastChangedAt = cached.lastChangedAt || cached.updatedAt || new Date(0);
+          const diffHours = (now - lastChangedAt) / (1000 * 60 * 60);
+
+          if (diffHours > 24) continue; // Dead: Stop polling
+
+          if (diffHours > 1) {
+            // Stagnant: Poll every 5 minutes (every 60 cycles)
+            const cycleCount = Math.floor(now.getTime() / this.interval);
+            if (cycleCount % 60 !== 0) continue;
+          }
+
+          mintsToPoll.push(mint);
+        }
+
+        if (mintsToPoll.length > 0) {
+          console.log(`📡 [PRICE-SYNC] Polling ${mintsToPoll.length}/${uniqueMints.length} active tokens...`);
+          
+          for (const mint of mintsToPoll) {
+            const priceRes = await fetch(`https://api.solanatracker.io/price?tokenAddress=${mint}`).catch(() => null);
+            const priceData = priceRes ? await priceRes.json() : null;
+
+            if (priceData && priceData.price) {
+              const cached = await this.db.collection('token_prices').findOne({ mint });
+              const hasChanged = !cached || cached.price !== priceData.price;
+
+              const update = {
                 $set: { 
                   price: priceData.price,
                   updatedAt: new Date()
                 } 
-              },
-              { upsert: true }
-            );
+              };
+
+              if (hasChanged) {
+                update.$set.lastChangedAt = new Date();
+                update.$set.lastPrice = cached?.price || 0;
+              }
+
+              await this.db.collection('token_prices').updateOne({ mint }, update, { upsert: true });
+            }
           }
         }
 
