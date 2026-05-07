@@ -118,7 +118,7 @@ export class AlphaListener {
 
 **Token:** $${token.symbol}
 **Amount:** ${result.amount} SOL
-**Price:** `${result.price > 0 ? result.price.toFixed(10) : 'Market'} SOL`
+**Price:** \`${result.price > 0 ? result.price.toFixed(10) : 'Market'} SOL\`
 **TX:** [View on Solscan](https://solscan.io/tx/${result.hash})
 
 _Cora is now monitoring this position for Take Profit (+${user.settings?.tpPercent || 100}%) and Stop Loss (-${user.settings?.slPercent || 50}%)._
