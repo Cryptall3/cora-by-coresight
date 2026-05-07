@@ -502,16 +502,13 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will m
         const response = await getPositions(wallet.solAddress, { chainId: 'solana' });
         const pos = response.data.find(p => p.attributes.fungible_info?.implementations?.some(i => i.address === mint));
         
-        // 1. Fetch Live Data from our Global Cache
+        // 2. Fetch Live Price from our Global Cache
         const db = await (await import('../db.js')).connectToDatabase();
         const priceRecord = await db.collection('token_prices').findOne({ mint });
         const currentPrice = priceRecord?.price || 0;
         
-        const { getPositions } = await import('../../../cli/utils/api/client.js');
-        const profile = await userService.getProfile(ctx.from.id);
-        const wallet = profile.wallets[0];
-        const response = await getPositions(wallet.solAddress, { chainId: 'solana' });
-        const pos = response.data.find(p => p.attributes.fungible_info?.implementations?.some(i => i.address === mint));
+        // 3. Get Entry Data from our Database
+        const trade = await db.collection('trades').findOne({ userId: ctx.from.id, mint, status: 'open' });
 
         const info = pos?.attributes?.fungible_info || { symbol: 'TOKEN', name: 'Unknown Token' };
         const quantity = pos?.attributes?.quantity?.float || 0;
