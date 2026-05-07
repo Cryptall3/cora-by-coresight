@@ -35,7 +35,6 @@ async function startCora() {
   let webhookUrl = process.env.KOYEB_PUBLIC_URL || `https://${process.env.KOYEB_APP_NAME}.koyeb.app`;
   if (!webhookUrl.startsWith('http')) webhookUrl = `https://${webhookUrl}`;
   webhookUrl = webhookUrl.replace(/\/$/, ''); // Remove trailing slash if any
-
   const webhookPath = `/telegraf/${process.env.TELEGRAM_BOT_TOKEN}`;
 
   const server = http.createServer((req, res) => {

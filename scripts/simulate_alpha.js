@@ -29,12 +29,12 @@ async function simulateAlpha() {
 
     // Parse the CHIMP data into the expected format
     const mockToken = {
-      symbol: 'TEST_SNIPE',
-      name: 'Test Token',
+      symbol: 'BTROLL',
+      name: 'Baby Troll',
       mint: 'CipCfJTUvfuoJzRHRKbWGDDtdkLiUwaf5xb9iyzXpump',
-      marketCap: 10000,
-      liquidity: 1000,
-      buy_amount: 0.018,
+      marketCap: 44000,
+      liquidity: 8000,
+      buy_amount: 0.005,
       holders: 100,
       lpBurn: 100,
       devPercentage: 0.0,
