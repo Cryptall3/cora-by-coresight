@@ -639,7 +639,7 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will m
       const amount = parseFloat(ctx.match[2]);
       const profile = await userService.getProfile(ctx.from.id);
       
-      ctx.reply(`⏳ **Buying ${amount} SOL more...**`);
+      ctx.reply(`⏳ 👨‍💻 <b>Buying ${amount} SOL more...</b>`, { parse_mode: 'HTML' });
       
       // Temporarily override default buy amount for this execution
       const tempProfile = { ...profile, settings: { ...profile.settings, defaultBuyAmount: amount } };
@@ -648,9 +648,27 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will m
       const result = await executor.executeSnipe(tempProfile, { mint, symbol: 'TOKEN' });
 
       if (result.success) {
-        ctx.reply(`✅ **Successfully bought more!**\nTX: \`${result.hash}\``, { parse_mode: 'Markdown' });
+        // Fetch MC for the alert
+        const priceRes = await fetch(`https://data.solanatracker.io/price?token=${mint}`, {
+          headers: { 'x-api-key': process.env.SOLANATRACKER_API_KEY }
+        }).catch(() => null);
+        const priceData = priceRes ? await priceRes.json() : null;
+        const entryMC = priceData?.marketCap || 0;
+
+        const msg = `
+🚀 <b>Alpha Sniper: Position Expanded!</b>
+
+<b>Token:</b> $${result.symbol}
+<b>Amount:</b> <code>${amount} SOL</code>
+<b>Price:</b> <code>${result.price.toFixed(10)} SOL</code>
+<b>Entry MC:</b> <b>$${formatMCap(entryMC)}</b>
+<b>TX:</b> <a href="https://solscan.io/tx/${result.hash}">View on Solscan</a>
+
+<i>Cora is continuing to monitor this position.</i>
+        `;
+        ctx.reply(msg, { parse_mode: 'HTML', disable_web_page_preview: true });
       } else {
-        ctx.reply(`❌ **Buy Failed:** ${result.error}`);
+        ctx.reply(`❌ <b>Buy Failed:</b> ${result.error}`, { parse_mode: 'HTML' });
       }
     });
 
@@ -659,16 +677,33 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will m
       const percentage = parseInt(ctx.match[2]);
       const profile = await userService.getProfile(ctx.from.id);
       
-      ctx.reply(`⏳ **Selling ${percentage}%...**`);
+      ctx.reply(`⏳ 📉 <b>Selling ${percentage}%...</b>`, { parse_mode: 'HTML' });
       
       const executor = this.executor;
       const trade = { mint, symbol: 'TOKEN' };
       const result = await executor.executeSell(profile, trade, percentage);
 
       if (result.success) {
-        ctx.reply(`✅ **Successfully sold ${percentage}%!**\nTX: \`${result.hash}\``, { parse_mode: 'Markdown' });
+        // Fetch MC for the alert
+        const priceRes = await fetch(`https://data.solanatracker.io/price?token=${mint}`, {
+          headers: { 'x-api-key': process.env.SOLANATRACKER_API_KEY }
+        }).catch(() => null);
+        const priceData = priceRes ? await priceRes.json() : null;
+        const sellMC = priceData?.marketCap || 0;
+
+        const msg = `
+🏁 <b>Alpha Sniper: Position Closed!</b>
+
+<b>Token:</b> $${trade.symbol}
+<b>Sold:</b> <code>${percentage}%</code>
+<b>Sell MC:</b> <b>$${formatMCap(sellMC)}</b>
+<b>TX:</b> <a href="https://solscan.io/tx/${result.hash}">View on Solscan</a>
+
+<i>Position has been updated in your dashboard.</i>
+        `;
+        ctx.reply(msg, { parse_mode: 'HTML', disable_web_page_preview: true });
       } else {
-        ctx.reply(`❌ **Sell Failed:** ${result.error}`);
+        ctx.reply(`❌ <b>Sell Failed:</b> ${result.error}`, { parse_mode: 'HTML' });
       }
     });
 

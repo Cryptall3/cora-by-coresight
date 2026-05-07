@@ -113,18 +113,33 @@ export class AlphaListener {
         console.log(`💰 [SNIPE-SUCCESS] User ${user.userId} bought ${token.symbol}! Hash: ${result.hash}`);
         
         if (this.bot) {
+          // Fetch MC for the alert
+          const priceRes = await fetch(`https://data.solanatracker.io/price?token=${token.mint}`, {
+            headers: { 'x-api-key': process.env.SOLANATRACKER_API_KEY }
+          }).catch(() => null);
+          const priceData = priceRes ? await priceRes.json() : null;
+          const entryMC = priceData?.marketCap || 0;
+
+          const formatMCap = (val) => {
+            if (!val || val === 0) return 'N/A';
+            if (val >= 1000000) return (val/1000000).toFixed(1) + 'M';
+            if (val >= 1000) return (val/1000).toFixed(1) + 'k';
+            return val.toFixed(0);
+          };
+
           const msg = `
-🚀 **Alpha Sniper: Position Opened!**
+🚀 <b>Alpha Sniper: Position Opened!</b>
 
-**Token:** $${token.symbol}
-**Amount:** ${result.amount} SOL
-**Price:** \`${result.price > 0 ? result.price.toFixed(10) : 'Market'} SOL\`
-**TX:** [View on Solscan](https://solscan.io/tx/${result.hash})
+<b>Token:</b> $${token.symbol}
+<b>Amount:</b> <code>${result.amount} SOL</code>
+<b>Price:</b> <code>${result.price > 0 ? result.price.toFixed(10) : 'Market'} SOL</code>
+<b>Entry MC:</b> <b>$${formatMCap(entryMC)}</b>
+<b>TX:</b> <a href="https://solscan.io/tx/${result.hash}">View on Solscan</a>
 
-_Cora is now monitoring this position for Take Profit (+${user.settings?.tpPercent || 100}%) and Stop Loss (-${user.settings?.slPercent || 50}%)._
+<i>Cora is now monitoring this position for Take Profit (+${user.settings?.tpPercent || 100}%) and Stop Loss (-${user.settings?.slPercent || 50}%).</i>
           `;
           await this.bot.telegram.sendMessage(user.userId, msg, { 
-            parse_mode: 'Markdown',
+            parse_mode: 'HTML',
             disable_web_page_preview: true
           }).catch(() => {});
         }
