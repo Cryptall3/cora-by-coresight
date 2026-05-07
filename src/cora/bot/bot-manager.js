@@ -11,6 +11,13 @@ const subService = new SubscriptionService();
 const userService = new UserService();
 const tradeService = new TradeService();
 
+const formatMCap = (val) => {
+  if (!val || val === 0) return 'N/A';
+  if (val >= 1000000) return (val/1000000).toFixed(1) + 'M';
+  if (val >= 1000) return (val/1000).toFixed(1) + 'k';
+  return val.toFixed(0);
+};
+
 export class BotManager {
   constructor() {
     this.bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
@@ -567,13 +574,6 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will m
           const pnlValue = ((currentPriceSOL - avgEntryPrice) / avgEntryPrice) * 100;
           pnlStr = `${pnlValue >= 0 ? '🟢 +' : '🔴 '}${pnlValue.toFixed(2)}%`;
         }
-
-        const formatMCap = (val) => {
-          if (!val || val === 0) return 'N/A';
-          if (val >= 1000000) return (val/1000000).toFixed(1) + 'M';
-          if (val >= 1000) return (val/1000).toFixed(1) + 'k';
-          return val.toFixed(0);
-        };
 
         const msg = `
 💎 <b>Position: ${info.name} ($${info.symbol})</b>
