@@ -438,10 +438,33 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will m
         const { getPositions } = await import('../../../cli/utils/api/client.js');
         const response = await getPositions(wallet.solAddress, { chainId: 'solana' });
         
-        const positions = (response.data || []).filter(p => {
+        let positions = (response.data || []).filter(p => {
           const info = p.attributes.fungible_info;
           return info && info.symbol !== 'SOL' && p.attributes.quantity.float > 0.000001;
         });
+
+        // 📺 DEMO HIJACK: Add local trades to the display list
+        if (ctx.from.id.toString() === process.env.ADMIN_ID) {
+          const db = await (await import('../db.js')).connectToDatabase();
+          const openTrades = await db.collection('trades').find({ userId: ctx.from.id, status: 'open' }).toArray();
+          
+          openTrades.forEach(t => {
+            // Avoid duplicates if user actually owns it
+            if (!positions.some(p => p.attributes.fungible_info?.implementations?.some(i => i.address === t.mint))) {
+              positions.push({
+                attributes: {
+                  quantity: { float: 1.0 }, // Mock
+                  value: 0.99, // Mock
+                  fungible_info: {
+                    symbol: t.symbol,
+                    name: t.symbol,
+                    implementations: [{ chain_id: 'solana', address: t.mint }]
+                  }
+                }
+              });
+            }
+          });
+        }
 
         let msg = `📦 **Positions Hub**\n_Wallet: ${wallet.solAddress.slice(0,6)}...${wallet.solAddress.slice(-4)}_\n\nSelect a token to manage your position, view PnL, and see trade details:`;
         const buttons = [];
