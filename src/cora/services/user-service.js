@@ -299,6 +299,28 @@ export class UserService {
   /**
    * Fetch SOL balance and USD value for a specific address using Zerion API.
    */
+  /**
+   * Fetch total portfolio value from Zerion (Fungibles only)
+   */
+  async getPortfolioValue(solAddress) {
+    try {
+      const apiKey = process.env.ZERION_API_KEY;
+      const auth = Buffer.from(`${apiKey}:`).toString('base64');
+      
+      const res = await fetch(`https://api.zerion.io/v1/wallets/${solAddress}/portfolio?currency=usd`, {
+        headers: { 'Authorization': `Basic ${auth}` }
+      });
+      
+      if (!res.ok) return 0;
+      
+      const data = await res.json();
+      return data?.data?.attributes?.total?.positions || 0;
+    } catch (err) {
+      console.error('❌ [USER SERVICE] Error fetching portfolio:', err);
+      return 0;
+    }
+  }
+
   async getSolBalance(address) {
     try {
       const { getPositions } = await import('../../../cli/utils/api/client.js');

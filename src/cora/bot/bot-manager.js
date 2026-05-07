@@ -819,21 +819,24 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will m
       const profile = await userService.createUserProfile(userId);
       const activeWallet = profile.wallets[0];
 
-      // 3. Fetch Balance
-      const balance = await userService.getSolBalance(activeWallet.solAddress);
-      const balanceStr = `${balance.amount.toFixed(3)} SOL (~$${balance.usdValue.toFixed(2)})`;
+      // 3. Fetch Balance & Portfolio
+      const [balance, portfolioValue] = await Promise.all([
+        userService.getSolBalance(activeWallet.solAddress),
+        userService.getPortfolioValue(activeWallet.solAddress)
+      ]);
 
       // 4. Build Dashboard
       const welcomeMsg = `
-🤖 **Welcome to Cora, ${userName}!**
+🤖 <b>Welcome to Cora, ${userName}!</b>
 
-I am your personal autonomous trading agent powered by **ZERION**, connected to the Coresight Alpha detection system.
+I am your personal autonomous trading agent powered by <b>ZERION</b>, connected to the Coresight Alpha detection system.
 
-💳 **Primary Wallet:**
-\`${activeWallet.solAddress}\`
-💰 **Balance:** \`${balanceStr}\`
+💳 <b>Primary Wallet:</b>
+<code>${activeWallet.solAddress}</code>
+💰 <b>Balance:</b> <code>${balance.amount.toFixed(3)} SOL (~$${balance.usdValue.toFixed(2)})</code>
+💼 <b>Portfolio:</b> <code>$${portfolioValue.toFixed(2)}</code>
 
-*Status:* ${profile.settings.snipeEnabled ? '🟢 ACTIVE' : '🔴 PAUSED'}
+<i>Status:</i> ${profile.settings.snipeEnabled ? '🟢 ACTIVE' : '🔴 PAUSED'}
 
 Use the menu below to fund your wallet, configure your tactics, and start sniping.
       `;
