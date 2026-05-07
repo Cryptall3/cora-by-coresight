@@ -38,20 +38,22 @@ export class TradeExecutor {
       console.log(`🚀 [EXECUTOR] Starting Raptor Snipe | User: ${user.userId} | Token: ${token.symbol}`);
       console.log(`⚙️ [SETTINGS] Buy: ${settings.defaultBuyAmount} SOL | Slippage: ${settings.slippage} | Wallet: ${wallet.solAddress}`);
 
-      // 1. Get Quote and Swap Transaction from Solana Tracker (Raptor)
+      // 1. Get Quote and Swap Transaction from Solana Tracker V2 (More stable than Raptor Beta)
       const SOL_MINT = "So11111111111111111111111111111111111111112";
-      const amountLamports = Math.floor(settings.defaultBuyAmount * 1e9); // Convert SOL to lamports
+      const amountLamports = Math.floor(settings.defaultBuyAmount * 1e9); 
       
-      console.log(`📡 [RAPTOR-REQ] Fetching quote for ${amountLamports} lamports...`);
+      console.log(`📡 [EXECUTOR] Fetching V2 quote for ${amountLamports} lamports...`);
+      
+      // CLEAN SWAP TEST: Disabling feeAccount and feeBps to see if missing treasury ATA is causing reverts
       const raptorResult = await solanaTracker.quoteAndSwap({
         userPublicKey: wallet.solAddress,
         inputMint: SOL_MINT,
         outputMint: token.mint,
         amount: amountLamports,
         slippage: settings.slippage || 'auto', 
-        priorityFee: "high", 
-        feeAccount: process.env.TREASURY_ADDRESS,
-        feeBps: process.env.TREASURY_ADDRESS ? 100 : 0
+        priorityFee: "high"
+        // feeAccount: process.env.TREASURY_ADDRESS, 
+        // feeBps: 100 
       });
 
       console.log(`📡 [RAPTOR-QUOTE] Est. Out: ${raptorResult.quote.amountOut / 1e6} | Impact: ${raptorResult.quote.priceImpact}%`);

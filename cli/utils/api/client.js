@@ -27,6 +27,7 @@ export async function fetchAPI(pathname, params = {}, auth) {
     url.search = `?${queryString}`;
   }
 
+  console.log(`🌐 [API-DEBUG] Fetching: ${url.toString()}`);
 
   const headers = { 
     Accept: "application/json"
@@ -84,12 +85,12 @@ export async function getPortfolio(address, options = {}) {
 export async function getPositions(address, options = {}) {
   const params = {
     currency: "usd",
-    sort: "value",
+    sort: "-value", // Aligns with documented working curl example
   };
   
-  if (options.chainId !== 'solana') {
+  if (options.chainId && options.chainId !== 'solana') {
     params["filter[positions]"] = options.positionFilter || "no_filter";
-    if (options.chainId) params["filter[chain_ids]"] = options.chainId;
+    params["filter[chain_ids]"] = options.chainId;
   }
   
   return fetchAPI(`/wallets/${encodeURIComponent(address)}/positions`, params, options.auth);
