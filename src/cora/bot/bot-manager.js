@@ -465,15 +465,23 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will m
               });
               
               const avgEntryPrice = totalSpentSOL / totalTokensReceived;
-              // FETCH PRICE ON-DEMAND (Using correct production endpoint)
-              const priceRes = await fetch(`https://data.solanatracker.io/price?token=${mint}`, {
-                headers: { 'x-api-key': process.env.SOLANATRACKER_API_KEY }
-              }).catch(() => null);
-              const priceData = priceRes ? await priceRes.json() : null;
-              const currentPrice = priceData?.price || 0;
+              // FETCH PRICE ON-DEMAND (Corrected for SOL conversion)
+              const [priceRes, solRes] = await Promise.all([
+                fetch(`https://data.solanatracker.io/price?token=${mint}`, { headers: { 'x-api-key': process.env.SOLANATRACKER_API_KEY } }),
+                fetch(`https://data.solanatracker.io/price?token=So11111111111111111111111111111111111111112`, { headers: { 'x-api-key': process.env.SOLANATRACKER_API_KEY } })
+              ]).catch(() => [null, null]);
+
+              const [priceData, solData] = await Promise.all([
+                priceRes ? priceRes.json() : null,
+                solRes ? solRes.json() : null
+              ]);
+
+              const solPriceUSD = solData?.price || 150; // Fallback to 150 if API fails
+              const currentPriceUSD = priceData?.price || 0;
+              const currentPriceSOL = currentPriceUSD / solPriceUSD;
               
-              if (trades.length > 0 && currentPrice > 0) {
-                const pnl = ((currentPrice - avgEntryPrice) / avgEntryPrice) * 100;
+              if (trades.length > 0 && currentPriceSOL > 0) {
+                const pnl = ((currentPriceSOL - avgEntryPrice) / avgEntryPrice) * 100;
                 summary += `• <b>$${symbol}</b>: ${pnl >= 0 ? '📈 +' : '📉 '}${pnl.toFixed(1)}% (Avg: <code>${avgEntryPrice.toFixed(10)}</code>)\n`;
               } else {
                 summary += `• <b>$${symbol}</b>: ⏳ Syncing...\n`;
@@ -495,16 +503,6 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will m
         }
 
         buttons.push([Markup.button.callback('🔄 Refresh List', 'positions_hub')]);
-        buttons.push([Markup.button.callback('⬅️ Back to Hub', 'main_menu')]);
-
-        ctx.editMessageText(msg, {
-          parse_mode: 'Markdown',
-          ...Markup.inlineKeyboard(buttons)
-        });
-      } catch (err) {
-        console.error('❌ [BOT] Positions Error:', err);
-        ctx.reply('⚠️ Error loading positions.');
-      }
     });
 
     this.bot.action(/^manage_pos_(.+)$/, async (ctx) => {
@@ -513,43 +511,51 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will m
         const profile = await userService.getProfile(ctx.from.id);
         const wallet = profile.wallets[0];
         
-        // 1. Fetch Live Data from ST and Zerion
+        // 1. Fetch Live Data from Zerion
         const { getPositions } = await import('../../../cli/utils/api/client.js');
         const response = await getPositions(wallet.solAddress, { chainId: 'solana' });
         const pos = response.data.find(p => p.attributes.fungible_info?.implementations?.some(i => i.address === mint));
         
-        // 2. Fetch Live Price On-Demand (Correct Endpoint)
-        const priceRes = await fetch(`https://data.solanatracker.io/price?token=${mint}`, {
-          headers: { 'x-api-key': process.env.SOLANA_TRACKER_API_KEY }
-        }).catch(() => null);
-        const priceData = priceRes ? await priceRes.json() : null;
-        const currentPrice = priceData?.price || 0;
+        // 2. Fetch Live Price On-Demand (With SOL Conversion)
+        const [priceRes, solRes] = await Promise.all([
+          fetch(`https://data.solanatracker.io/price?token=${mint}`, { headers: { 'x-api-key': process.env.SOLANATRACKER_API_KEY } }),
+          fetch(`https://data.solanatracker.io/price?token=So11111111111111111111111111111111111111112`, { headers: { 'x-api-key': process.env.SOLANATRACKER_API_KEY } })
+        ]).catch(() => [null, null]);
+
+        const [priceData, solData] = await Promise.all([
+          priceRes ? priceRes.json() : null,
+          solRes ? solRes.json() : null
+        ]);
+
+        const solPriceUSD = solData?.price || 150;
+        const currentPriceUSD = priceData?.price || 0;
+        const currentPriceSOL = currentPriceUSD / solPriceUSD;
         
         // 3. Calculate Weighted Average from Database
         const { connectToDatabase } = await import('../db.js');
         const db = await connectToDatabase();
         const trades = await db.collection('trades').find({ userId: ctx.from.id, mint, status: 'open' }).toArray();
+        
         let totalSpentSOL = 0;
         let totalTokensReceived = 0;
         trades.forEach(t => {
           totalSpentSOL += t.buyAmount || 0;
           totalTokensReceived += t.receivedAmount || (t.buyAmount / t.buyPrice);
         });
+        
         const avgEntryPrice = totalSpentSOL / totalTokensReceived;
         const initialMCap = avgEntryPrice * 1000000000;
+        const currentMCap = currentPriceSOL * 1000000000;
 
         const info = pos?.attributes?.fungible_info || { symbol: 'TOKEN', name: 'Unknown Token' };
         const quantity = pos?.attributes?.quantity?.float || 0;
         const currentValue = pos?.attributes?.value || 0;
 
         let pnlStr = "N/A";
-        if (trades.length > 0 && currentPrice > 0) {
-          const pnl = ((currentPrice - avgEntryPrice) / avgEntryPrice) * 100;
-          pnlStr = `${pnl >= 0 ? '🟢 +' : '🔴 '}${pnl.toFixed(2)}%`;
+        if (trades.length > 0 && currentPriceSOL > 0) {
+          const pnlValue = ((currentPriceSOL - avgEntryPrice) / avgEntryPrice) * 100;
+          pnlStr = `${pnlValue >= 0 ? '🟢 +' : '🔴 '}${pnlValue.toFixed(2)}%`;
         }
-
-        // 3. Estimate Live Market Cap from our Cache (assuming 1B supply)
-        const currentMCap = currentPrice * 1000000000;
 
         const formatMCap = (val) => {
           if (!val || val === 0) return 'N/A';
@@ -568,8 +574,8 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will m
 • Holding: \`${quantity.toFixed(4)} ${info.symbol}\`
 
 **📈 Trade Entry:**
-• Entry Price: \`$${trade?.buyPrice?.toFixed(10) || 'N/A'}\`
-• Entry SOL: \`${trade?.buyAmount?.toFixed(3) || 'N/A'} SOL\`
+• Entry Price: \`$${avgEntryPrice.toFixed(10)} SOL\`
+• Entry SOL: \`${totalSpentSOL.toFixed(3)} SOL\`
 • Initial MCap: \`$${formatMCap(initialMCap)}\`
 • Live MCap: \`$${formatMCap(currentMCap)}\`
 
