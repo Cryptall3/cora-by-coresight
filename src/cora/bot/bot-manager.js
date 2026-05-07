@@ -522,6 +522,8 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will m
         const currentPrice = priceData?.price || 0;
         
         // 3. Calculate Weighted Average from Database
+        const { connectToDatabase } = await import('../db.js');
+        const db = await connectToDatabase();
         const trades = await db.collection('trades').find({ userId: ctx.from.id, mint, status: 'open' }).toArray();
         let totalSpentSOL = 0;
         let totalTokensReceived = 0;
