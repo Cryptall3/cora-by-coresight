@@ -9,7 +9,7 @@ const userService = new UserService();
 export class AutoExitService {
   constructor() {
     this.isRunning = false;
-    this.interval = 60000; // Check every 60 seconds
+    this.interval = 2000; // Check every 2 seconds for high-speed trading
     this.db = null;
   }
 
@@ -126,15 +126,13 @@ Cora has completed her mission window. New signals will not be sniped.
 
       const { tpPercent, slPercent } = profile.settings;
 
-      // 2. Get Current Price
-      // 3. Calculate PnL
-      const buyPrice = trade.buyPrice;
-      const currentPrice = 0; // Price logic needs to be updated to ST or other
-      // For now, we rely on the DB stored metadata for the symbol/decimals
-      const pnlPercent = 0; // Temporary placeholder until price logic is moved
+      // 2. Get Current Price from Solana Tracker (much faster and more reliable than Zerion for new tokens)
+      const priceRes = await fetch(`https://api.solanatracker.io/price?tokenAddress=${trade.mint}`);
+      const priceData = await priceRes.json();
+      const currentPrice = priceData.price || 0;
 
       if (currentPrice === 0) {
-        console.warn(`⚠️ [AUTO-EXIT] Could not fetch price for ${trade.symbol}`);
+        // Fallback for extremely new tokens: wait for indexer
         return;
       }
 
