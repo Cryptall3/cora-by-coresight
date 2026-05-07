@@ -1,5 +1,4 @@
 import { connectToDatabase } from '../db.js';
-import fetch from 'node-fetch';
 
 export class PriceMonitorService {
   constructor() {
