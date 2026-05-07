@@ -126,13 +126,11 @@ Cora has completed her mission window. New signals will not be sniped.
 
       const { tpPercent, slPercent } = profile.settings;
 
-      // 2. Get Current Price from Solana Tracker (much faster and more reliable than Zerion for new tokens)
-      const priceRes = await fetch(`https://api.solanatracker.io/price?tokenAddress=${trade.mint}`);
-      const priceData = await priceRes.json();
-      const currentPrice = priceData.price || 0;
+      // 2. Get Current Price from our Global Cache (PriceMonitorService updates this every 5s)
+      const priceRecord = await this.db.collection('token_prices').findOne({ mint: trade.mint });
+      const currentPrice = priceRecord?.price || 0;
 
       if (currentPrice === 0) {
-        // Fallback for extremely new tokens: wait for indexer
         return;
       }
 

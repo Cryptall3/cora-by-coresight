@@ -443,26 +443,27 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will m
           msg = `📦 **Positions Hub**\n\n_No active positions found in this wallet._`;
         } else {
           const db = await (await import('../db.js')).connectToDatabase();
-          
+          let summary = '';
+
           for (let i = 0; i < positions.length; i += 2) {
             const row = [];
             
             const createButton = async (p) => {
               const info = p.attributes.fungible_info;
+              const symbol = info.symbol;
               const mint = info.implementations.find(imm => imm.chain_id === 'solana')?.address;
-              const trade = await db.collection('trades').findOne({ userId: ctx.from.id, mint, status: 'open' });
               
-              let label = `$${info.symbol}`;
+              // Find matching trade to show PnL in the summary text from cache
+              const trade = await db.collection('trades').findOne({ userId: ctx.from.id, mint, status: 'open' });
               if (trade) {
-                const priceRes = await fetch(`https://api.solanatracker.io/price?tokenAddress=${mint}`).catch(() => null);
-                const priceData = priceRes ? await priceRes.json() : null;
-                const currentPrice = priceData?.price || 0;
+                const priceRecord = await db.collection('token_prices').findOne({ mint });
+                const currentPrice = priceRecord?.price || 0;
                 if (currentPrice > 0) {
                   const pnl = ((currentPrice - trade.buyPrice) / trade.buyPrice) * 100;
-                  label += ` ${pnl >= 0 ? '📈 +' : '📉 '}${pnl.toFixed(0)}%`;
+                  summary += `• **$${symbol}**: ${pnl >= 0 ? '📈 +' : '📉 '}${pnl.toFixed(1)}%\n`;
                 }
               }
-              return Markup.button.callback(label, `manage_pos_${mint}`);
+              return Markup.button.callback(`$${symbol}`, `manage_pos_${mint}`);
             };
 
             row.push(await createButton(positions[i]));
@@ -470,6 +471,10 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will m
               row.push(await createButton(positions[i+1]));
             }
             buttons.push(row);
+          }
+          
+          if (summary) {
+            msg = `📦 **Positions Hub**\n_Wallet: ${wallet.solAddress.slice(0,6)}...${wallet.solAddress.slice(-4)}_\n\n**Performance:**\n${summary}\nSelect a token to manage:`;
           }
         }
 
@@ -497,13 +502,16 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will m
         const response = await getPositions(wallet.solAddress, { chainId: 'solana' });
         const pos = response.data.find(p => p.attributes.fungible_info?.implementations?.some(i => i.address === mint));
         
-        const priceRes = await fetch(`https://api.solanatracker.io/price?tokenAddress=${mint}`);
-        const priceData = await priceRes.json();
-        const currentPrice = priceData.price || 0;
-        
-        // 2. Get Entry Data from our Database
+        // 1. Fetch Live Data from our Global Cache
         const db = await (await import('../db.js')).connectToDatabase();
-        const trade = await db.collection('trades').findOne({ userId: ctx.from.id, mint, status: 'open' });
+        const priceRecord = await db.collection('token_prices').findOne({ mint });
+        const currentPrice = priceRecord?.price || 0;
+        
+        const { getPositions } = await import('../../../cli/utils/api/client.js');
+        const profile = await userService.getProfile(ctx.from.id);
+        const wallet = profile.wallets[0];
+        const response = await getPositions(wallet.solAddress, { chainId: 'solana' });
+        const pos = response.data.find(p => p.attributes.fungible_info?.implementations?.some(i => i.address === mint));
 
         const info = pos?.attributes?.fungible_info || { symbol: 'TOKEN', name: 'Unknown Token' };
         const quantity = pos?.attributes?.quantity?.float || 0;
@@ -514,6 +522,18 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will m
           const pnl = ((currentPrice - trade.buyPrice) / trade.buyPrice) * 100;
           pnlStr = `${pnl >= 0 ? '🟢 +' : '🔴 '}${pnl.toFixed(2)}%`;
         }
+
+        // 3. Estimate Live Market Cap from our Cache (assuming 1B supply)
+        const currentMCap = currentPrice * 1000000000;
+
+        const initialMCap = trade?.entryMarketCap || 0;
+
+        const formatMCap = (val) => {
+          if (!val || val === 0) return 'N/A';
+          if (val >= 1000000) return (val/1000000).toFixed(1) + 'M';
+          if (val >= 1000) return (val/1000).toFixed(1) + 'k';
+          return val.toFixed(0);
+        };
 
         const msg = `
 💎 **Position: ${info.name} ($${info.symbol})**
@@ -527,7 +547,8 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will m
 **📈 Trade Entry:**
 • Entry Price: \`$${trade?.buyPrice?.toFixed(10) || 'N/A'}\`
 • Entry SOL: \`${trade?.buyAmount?.toFixed(3) || 'N/A'} SOL\`
-• Initial Market Cap: \`${trade?.entryMarketCap || 'N/A'}\`
+• Initial MCap: \`$${formatMCap(initialMCap)}\`
+• Live MCap: \`$${formatMCap(currentMCap)}\`
 
 **Status:** ⏳ **MONITORING**
         `;

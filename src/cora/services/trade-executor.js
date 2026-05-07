@@ -252,8 +252,8 @@ export class TradeExecutor {
       symbol: symbol,
       decimals: decimals, 
       buyAmount: parseFloat(quote.amountIn) / 1e9, 
-      buyPrice: token.price || (parseFloat(quote.amountIn) / 1e9 / (parseFloat(quote.amountOut) / Math.pow(10, decimals))), // Calculate entry price if not provided
-      entryMarketCap: token.marketCap || 'N/A', // Store market cap at time of snipe
+      buyPrice: token.price || (parseFloat(quote.amountIn) / 1e9 / (parseFloat(quote.amountOut) / Math.pow(10, decimals))), 
+      entryMarketCap: (token.price || (parseFloat(quote.amountIn) / 1e9 / (parseFloat(quote.amountOut) / Math.pow(10, decimals)))) * 1000000000, 
       txHash: result.hash,
       timestamp: new Date(),
       status: 'open',
