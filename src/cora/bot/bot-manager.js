@@ -14,6 +14,10 @@ export class BotManager {
   constructor() {
     this.bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
     this.userStates = new Map(); // For interactive prompts
+    this.executor = new (async () => {
+      const { TradeExecutor } = await import('../services/trade-executor.js');
+      return new TradeExecutor();
+    })() // Lazy load to avoid circular deps if any
     this.setupHandlers();
   }
 
@@ -402,6 +406,117 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will m
       }
     });
 
+    this.bot.action('positions_hub', async (ctx) => {
+      try {
+        const profile = await userService.getProfile(ctx.from.id);
+        const wallet = profile.wallets[0];
+        
+        ctx.answerCbQuery('Fetching positions... ⏳');
+        const { getPositions } = await import('../../../cli/utils/api/client.js');
+        const response = await getPositions(wallet.solAddress, { chainId: 'solana' });
+        
+        const positions = (response.data || []).filter(p => {
+          const info = p.attributes.fungible_info;
+          return info && info.symbol !== 'SOL' && p.attributes.quantity.float > 0.000001;
+        });
+
+        let msg = `📦 **Live Positions**\n_Wallet: ${wallet.solAddress.slice(0,6)}...${wallet.solAddress.slice(-4)}_\n\n`;
+        const buttons = [];
+
+        if (positions.length === 0) {
+          msg += '_No active token positions found._';
+        } else {
+          positions.forEach(p => {
+            const attr = p.attributes;
+            const info = attr.fungible_info;
+            const mint = info.implementations.find(i => i.chain_id === 'solana')?.address;
+            
+            msg += `• **${info.symbol}**: \`${attr.quantity.float.toFixed(4)}\` (~$${attr.value?.toFixed(2) || '0'})\n`;
+            
+            if (mint) {
+              buttons.push([
+                Markup.button.callback(`➕ Buy ${info.symbol}`, `pos_buy_menu_${mint}`),
+                Markup.button.callback(`🔴 Sell ${info.symbol}`, `pos_sell_menu_${mint}`)
+              ]);
+            }
+          });
+        }
+
+        buttons.push([Markup.button.callback('🔄 Refresh', 'positions_hub')]);
+        buttons.push([Markup.button.callback('⬅️ Back', 'main_menu')]);
+
+        ctx.editMessageText(msg, {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard(buttons)
+        });
+      } catch (err) {
+        console.error('❌ [BOT] Positions Error:', err);
+        ctx.reply('⚠️ Error loading positions.');
+      }
+    });
+
+    this.bot.action(/^pos_buy_menu_(.+)$/, async (ctx) => {
+      const mint = ctx.match[1];
+      ctx.editMessageText('💰 **Buy More**\n\nSelect a preset SOL amount to add to this position:', {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback('0.1 SOL', `pos_buy_exec_${mint}_0.1`), Markup.button.callback('0.25 SOL', `pos_buy_exec_${mint}_0.25`)],
+          [Markup.button.callback('0.5 SOL', `pos_buy_exec_${mint}_0.5`), Markup.button.callback('1.0 SOL', `pos_buy_exec_${mint}_1.0`)],
+          [Markup.button.callback('⬅️ Cancel', 'positions_hub')]
+        ])
+      });
+    });
+
+    this.bot.action(/^pos_sell_menu_(.+)$/, async (ctx) => {
+      const mint = ctx.match[1];
+      ctx.editMessageText('🔴 **Sell Position**\n\nWhat percentage of your tokens do you want to sell?', {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback('25%', `pos_sell_exec_${mint}_25`), Markup.button.callback('50%', `pos_sell_exec_${mint}_50`)],
+          [Markup.button.callback('75%', `pos_sell_exec_${mint}_75`), Markup.button.callback('100% (All)', `pos_sell_exec_${mint}_100`)],
+          [Markup.button.callback('⬅️ Cancel', 'positions_hub')]
+        ])
+      });
+    });
+
+    this.bot.action(/^pos_buy_exec_(.+)_(.+)$/, async (ctx) => {
+      const mint = ctx.match[1];
+      const amount = parseFloat(ctx.match[2]);
+      const profile = await userService.getProfile(ctx.from.id);
+      
+      ctx.reply(`⏳ **Buying ${amount} SOL more...** (via ST)`);
+      
+      // Temporarily override default buy amount for this execution
+      const tempProfile = { ...profile, settings: { ...profile.settings, defaultBuyAmount: amount } };
+      
+      const executor = this.executor;
+      const result = await executor.executeSnipe(tempProfile, { mint, symbol: 'TOKEN' });
+
+      if (result.success) {
+        ctx.reply(`✅ **Successfully bought more!**\nTX: \`${result.hash}\``, { parse_mode: 'Markdown' });
+      } else {
+        ctx.reply(`❌ **Buy Failed:** ${result.error}`);
+      }
+    });
+
+    this.bot.action(/^pos_sell_exec_(.+)_(.+)$/, async (ctx) => {
+      const mint = ctx.match[1];
+      const percentage = parseInt(ctx.match[2]);
+      const profile = await userService.getProfile(ctx.from.id);
+      
+      ctx.reply(`⏳ **Selling ${percentage}%...** (via ST)`);
+      
+      const executor = this.executor;
+      const trade = { mint, symbol: 'TOKEN' };
+      const result = await executor.executeSell(profile, trade, percentage);
+
+      if (result.success) {
+        ctx.reply(`✅ **Successfully sold ${percentage}%!**\nTX: \`${result.hash}\``, { parse_mode: 'Markdown' });
+      } else {
+        ctx.reply(`❌ **Sell Failed:** ${result.error}`);
+      }
+    });
+
     this.bot.action(/^delete_confirm_(.+)$/, async (ctx) => {
       const walletId = ctx.match[1];
       ctx.editMessageText('⚠️ **Confirm Deletion**\n\nAre you absolutely sure you want to delete this wallet? This cannot be undone.', {
@@ -451,7 +566,7 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will m
         this.sendDashboard(ctx);
       }
       else if (state.action === 'await_custom_slip') {
-        if (isNaN(val) || val <= 0 || val > 50) return ctx.reply('❌ **Invalid percentage.** (Max 50%)', { parse_mode: 'Markdown' });
+        if (isNaN(val) || val <= 0 || val > 99) return ctx.reply('❌ **Invalid percentage.** (Max 99%)', { parse_mode: 'Markdown' });
         await userService.updateSettings(ctx.from.id, { ...profile.settings, slippage: val });
         this.userStates.delete(ctx.from.id);
         ctx.reply(`✅ **Slippage set to ${val}%**`, { parse_mode: 'Markdown' });
@@ -553,7 +668,7 @@ Use the menu below to fund your wallet, configure your tactics, and start snipin
     return Markup.inlineKeyboard([
       [Markup.button.callback('🎯 Alpha Sniper', 'alpha_sniper'), Markup.button.callback('👥 Copytrade', 'copytrade_hub')],
       [Markup.button.callback('💰 Wallet', 'wallet_settings'), Markup.button.callback('📈 PnL Stats', 'pnl_dashboard')],
-      [Markup.button.callback('⚙️ Tactics', 'tactics_settings'), Markup.button.url('📚 Docs', 'https://docs.coresight.xyz')]
+      [Markup.button.callback('⚙️ Tactics', 'tactics_settings'), Markup.button.callback('📦 Positions', 'positions_hub')]
     ]);
   }
 }

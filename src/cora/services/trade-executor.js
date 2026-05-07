@@ -1,6 +1,7 @@
-import { getSwapQuote, executeSwap } from '../../../cli/utils/trading/swap.js';
 import { connectToDatabase } from '../db.js';
 import { UserService } from './user-service.js';
+import * as solanaTracker from '../../../cli/utils/api/solana-tracker.js';
+import { signAndSendRaptorTransaction } from '../../../cli/utils/chain/solana.js';
 
 const userService = new UserService();
 
@@ -22,11 +23,8 @@ export class TradeExecutor {
     try {
       await this.initialize();
       
-      // ENSURE WALLETS ARE LOADED: Restore from DB to memory keystore
-      // The listener fetches raw profiles, so we must activate them for CLI usage
       const activeProfile = await userService.createUserProfile(user.userId);
       const settings = activeProfile.settings;
-      const GAS_BUFFER = 0.005;
       
       // Use the primary wallet and its secure agent token
       const wallet = activeProfile.wallets[0]; 
@@ -36,90 +34,56 @@ export class TradeExecutor {
         throw new Error(`User ${user.userId} has no agent token for wallet ${wallet.walletName}`);
       }
 
-      console.log('FROM ADDR:', wallet.solAddress, 'len:', wallet.solAddress?.length);
+      console.log(`🚀 [EXECUTOR] Starting Raptor Snipe | User: ${user.userId} | Token: ${token.symbol}`);
+
+      // 1. Get Quote and Swap Transaction from Solana Tracker (Raptor)
+      const SOL_MINT = "So11111111111111111111111111111111111111112";
+      const amountLamports = Math.floor(settings.defaultBuyAmount * 1e9); // Convert SOL to lamports
       
-      // Safety Guard: Force Solana check
-      if (!wallet.solAddress || wallet.solAddress.startsWith('0x') || wallet.solAddress.length < 32) {
-        throw new Error(`Invalid Solana wallet: ${wallet.solAddress}. Reverting to EVM protection.`);
-      }
+      const raptorResult = await solanaTracker.quoteAndSwap({
+        userPublicKey: wallet.solAddress,
+        inputMint: SOL_MINT,
+        outputMint: token.mint,
+        amount: amountLamports,
+        slippage: settings.slippage || 3.0, // Uses full user-defined slippage
+        priorityFee: "high", // Sniper mode!
+        feeAccount: process.env.TREASURY_ADDRESS, // Platform fee recipient
+        feeBps: process.env.TREASURY_ADDRESS ? 100 : 0 // 1% fee if treasury set
+      });
 
-      console.log(`🚀 [EXECUTOR] Starting trade for ${user.userId} | Token: ${token.symbol}`);
+      console.log(`📡 [RAPTOR-QUOTE] Est. ${token.symbol} Out: ${raptorResult.quote.amountOut / 1e6}`);
 
-      // 1. Prepare CLI Environment
-      process.env.ZERION_AGENT_TOKEN = agentToken;
+      // 2. Sign and Send via Yellowstone Jet TPU
+      const result = await signAndSendRaptorTransaction(
+        raptorResult.swapTransaction,
+        wallet.walletName,
+        null // Passphrase handled by keystore env resolution
+      );
+
+      console.log(`✅ [TRADE] Success! TX: ${result.hash}`);
       
-      // 2. Execute via CLI Logic
-      // We import the CLI's own swap command to ensure perfect parameter assembly
-      const swapCommand = (await import('../../../cli/commands/trading/swap.js')).default;
-      
-      const args = ['SOL', token.mint, settings.defaultBuyAmount.toString()];
-      const flags = {
-        chain: 'solana',
-        wallet: wallet.walletName,
-        slippage: Math.min(settings.slippage || 1, 3).toString() // CLI caps at 3%
-      };
-
-      console.log(`📡 [CLI-MODE] Executing: zerion swap ${args.join(' ')} --chain ${flags.chain} --slippage ${flags.slippage}`);
-
-      // CLI command handles quote, signing, and broadcasting internally
-      try {
-        // Temporarily override process.exit to prevent CLI from killing the bot
-        const originalExit = process.exit;
-        process.exit = (code) => { 
-          if (code !== 0) throw new Error(`CLI exited with code ${code}`); 
-        };
-        
-        await swapCommand(args, flags);
-        
-        process.exit = originalExit; // Restore
-      } catch (cliError) {
-        console.error(`❌ [CLI-FAIL] Swap failed:`, cliError.message);
-        throw cliError;
-      }
+      // 3. Record trade in DB
+      await this.recordTrade(user.userId, token, raptorResult.quote, result, settings.currentMissionId);
 
       return {
         success: true,
+        hash: result.hash,
         symbol: token.symbol,
         amount: settings.defaultBuyAmount
       };
 
-      // Cleanup
-      delete process.env.ZERION_AGENT_TOKEN;
-
-      if (result.status === 'success') {
-        console.log(`✅ [TRADE] Success! TX: ${result.hash}`);
-        await this.recordTrade(user.userId, token, quote, result, settings.currentMissionId);
-        return { 
-          success: true, 
-          hash: result.hash, 
-          amount: settings.defaultBuyAmount,
-          price: token.price || 0
-        };
-      } else {
-        throw new Error(result.error || 'Swap failed');
-      }
-
     } catch (error) {
-      let detailedError = error.message;
-      if (error.response) {
-        console.error(`❌ [ZERION ERROR BODY]:`, JSON.stringify(error.response, null, 2));
-        // Extract a human-readable reason if available
-        const zerionMsg = error.response.errors?.[0]?.detail || error.response.message;
-        if (zerionMsg) detailedError = `Zerion: ${zerionMsg}`;
-      }
-      
-      console.error(`❌ [EXECUTOR] Trade failed for user ${user.userId}:`, detailedError);
-      return { success: false, error: detailedError };
+      console.error(`❌ [EXECUTOR] Raptor Snipe failed for user ${user.userId}:`, error.message);
+      return { success: false, error: error.message };
     }
   }
 
   /**
    * Execute a sell (swap back to SOL) for a specific trade
    */
-  async executeSell(user, trade) {
+  async executeSell(user, trade, sellPercentage = 100) {
     try {
       await this.initialize();
-      const GAS_BUFFER = 0.005;
       
       // Use the primary wallet and its secure agent token
       const wallet = user.wallets[0]; 
@@ -129,13 +93,7 @@ export class TradeExecutor {
         throw new Error('No secure agent token found.');
       }
 
-      // 0. Pre-flight Gas Check
-      const solBalance = await userService.getSolBalance(wallet.solAddress);
-      if (solBalance.amount < GAS_BUFFER) {
-        throw new Error(`insufficient_gas: Required ${GAS_BUFFER} SOL for gas, found ${solBalance.amount.toFixed(4)} SOL`);
-      }
-
-      console.log(`📉 [EXECUTOR] Starting SELL for ${user.userId} | Token: ${trade.symbol}`);
+      console.log(`📉 [EXECUTOR] Starting Raptor SELL for ${user.userId} | Token: ${trade.symbol} | Amount: ${sellPercentage}%`);
 
       // 1. Get the current balance of the token to sell
       const balance = await this.getTokenBalance(wallet.solAddress, trade.mint);
@@ -145,49 +103,52 @@ export class TradeExecutor {
         return { success: true };
       }
 
-      // 2. Get Quote for SELL (Token -> SOL)
-      const quote = await getSwapQuote({
-        fromToken: trade.mint,
-        toToken: 'SOL',
-        amount: balance.toString(),
-        fromChain: 'solana',
-        toChain: 'solana',
-        walletAddress: wallet.solAddress,
-        slippage: user.settings.slippage || 1.0
+      // 2. Get Quote and Swap Transaction for SELL (Token -> SOL)
+      const SOL_MINT = "So11111111111111111111111111111111111111112";
+      
+      const tokenInfo = await this.getTokenMetadata(trade.mint);
+      const amountToSell = balance * (sellPercentage / 100);
+      const rawAmount = Math.floor(amountToSell * Math.pow(10, tokenInfo.decimals || 6));
+
+      const raptorResult = await solanaTracker.quoteAndSwap({
+        userPublicKey: wallet.solAddress,
+        inputMint: trade.mint,
+        outputMint: SOL_MINT,
+        amount: rawAmount,
+        slippage: user.settings.slippage || 3.0,
+        priorityFee: "medium",
+        feeAccount: process.env.TREASURY_ADDRESS,
+        feeBps: process.env.TREASURY_ADDRESS ? 100 : 0
       });
 
-      console.log(`📝 [QUOTE] Found exit route for ${trade.symbol}. Est. SOL: ${quote.estimatedOutput}`);
+      console.log(`📝 [RAPTOR-QUOTE] Found exit route for ${trade.symbol}. Est. SOL: ${raptorResult.quote.amountOut / 1e9}`);
 
-      // 3. Execute Swap
-      process.env.ZERION_AGENT_TOKEN = agentToken;
-      const result = await executeSwap(quote, wallet.walletName, null);
-      delete process.env.ZERION_AGENT_TOKEN;
+      // 3. Sign and Send
+      const result = await signAndSendRaptorTransaction(
+        raptorResult.swapTransaction,
+        wallet.walletName,
+        null
+      );
 
-      if (result.status === 'success') {
+      if (result.hash) {
         console.log(`✅ [SELL] Success! TX: ${result.hash}`);
-        const sellPrice = quote.estimatedOutput / balance; // Rough estimate or use market price
-        await this.recordExit(trade._id, sellPrice, 'closed', result.hash, quote.estimatedOutput);
+        const solReceived = raptorResult.quote.amountOut / 1e9;
+        const sellPrice = solReceived / balance; 
+        await this.recordExit(trade._id, sellPrice, 'closed', result.hash, solReceived);
         return { success: true, hash: result.hash };
       } else {
-        throw new Error(result.error || 'Sell swap failed');
+        throw new Error('Sell swap failed to return hash');
       }
 
     } catch (error) {
-      let detailedError = error.message;
-      if (error.response) {
-        console.error(`❌ [ZERION SELL ERROR BODY]:`, JSON.stringify(error.response, null, 2));
-        const zerionMsg = error.response.errors?.[0]?.detail || error.response.message;
-        if (zerionMsg) detailedError = `Zerion: ${zerionMsg}`;
-      }
-
-      console.error(`❌ [EXECUTOR] Sell failed for user ${user.userId}:`, detailedError);
-      return { success: false, error: detailedError };
+      console.error(`❌ [EXECUTOR] Raptor Sell failed for user ${user.userId}:`, error.message);
+      return { success: false, error: error.message };
     }
   }
 
   async getTokenBalance(address, mint) {
-    // This is a helper to get balance via Zerion API or web3
     try {
+      // We can use Zerion for balance checking (it's reliable for indexer data)
       const { getPositions } = await import('../../../cli/utils/api/client.js');
       const response = await getPositions(address, { chainId: 'solana' });
       const match = (response.data || []).find(
@@ -200,15 +161,29 @@ export class TradeExecutor {
     }
   }
 
+  async getTokenMetadata(mint) {
+    try {
+      const { getFungible } = await import('../../../cli/utils/api/client.js');
+      const response = await getFungible(`solana/${mint}`);
+      return {
+        decimals: response.data?.attributes?.implementations?.[0]?.decimals || 6,
+        symbol: response.data?.attributes?.symbol || 'TOKEN'
+      };
+    } catch (error) {
+      return { decimals: 6, symbol: 'TOKEN' };
+    }
+  }
+
   async recordTrade(userId, token, quote, result, missionId = null) {
+    const meta = await this.getTokenMetadata(token.mint);
     const trade = {
       userId,
       missionId,
       mint: token.mint,
       symbol: token.symbol,
-      buyAmount: quote.inputAmount,
+      buyAmount: parseFloat(quote.amountIn) / 1e9, // SOL spent
       buyPrice: token.price || 0, // Market price at detection
-      receivedAmount: quote.estimatedOutput,
+      receivedAmount: parseFloat(quote.amountOut) / Math.pow(10, meta.decimals),
       txHash: result.hash,
       timestamp: new Date(),
       status: 'open',
@@ -230,7 +205,6 @@ export class TradeExecutor {
       }
     };
     
-    // Calculate PnL if we have buyPrice and sellPrice
     const trade = await this.db.collection('trades').findOne({ _id: tradeId });
     if (trade && trade.buyPrice > 0 && sellPrice > 0) {
       const pnlPercent = ((sellPrice - trade.buyPrice) / trade.buyPrice) * 100;

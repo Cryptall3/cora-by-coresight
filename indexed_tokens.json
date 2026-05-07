@@ -1,0 +1,502 @@
+[
+  {
+    "symbol": "USDT",
+    "name": "Tether USD",
+    "address": "0x0709f39376deee2a2dfc94a58edeb2eb9df012bd"
+  },
+  {
+    "symbol": "USDC",
+    "name": "USDC",
+    "address": "0x1f3aa82227281ca364bfb3d253b0f1af1da6473e"
+  },
+  {
+    "symbol": "SOL",
+    "name": "Solana",
+    "address": "N/A"
+  },
+  {
+    "symbol": "WBTC",
+    "name": "Wrapped BTC",
+    "address": "0x0555e30da8f98308edb960aa94c0db47230d2b9c"
+  },
+  {
+    "symbol": "USDS",
+    "name": "USDS",
+    "address": "0x6491c05a82219b8d1479057361ff1654749b876b"
+  },
+  {
+    "symbol": "cbBTC",
+    "name": "Coinbase Wrapped BTC",
+    "address": "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf"
+  },
+  {
+    "symbol": "WETH",
+    "name": "Wrapped Ether",
+    "address": "0x3439153eb7af838ad19d56e1571fbd09333c2809"
+  },
+  {
+    "symbol": "USDG",
+    "name": "Global Dollar",
+    "address": "0xe343167631d89b6ffc58b88d6b7fb0228795491d"
+  },
+  {
+    "symbol": "JLP",
+    "name": "Jupiter Perps LP",
+    "address": "27G8MtK7VtTcCHkpASjSDdkWWYfoqT6ggEuKidVJidD4"
+  },
+  {
+    "symbol": "usdy",
+    "name": "Ondo US Dollar Yield",
+    "address": "0x35e050d3c0ec2d29d269a8ecea763a183bdf9a9d"
+  },
+  {
+    "symbol": "WLFI",
+    "name": "World Liberty Financial",
+    "address": "0x47474747477b199288bf72a1d702f7fe0fb1deea"
+  },
+  {
+    "symbol": "JitoSOL",
+    "name": "Jito Staked SOL",
+    "address": "0x6c16e26013f2431e8b2e1ba7067ecccad0db6c52"
+  },
+  {
+    "symbol": "LBTC",
+    "name": "Lombard Staked Bitcoin",
+    "address": "0xecac9c5f704e954931349da37f60e39f515c11c1"
+  },
+  {
+    "symbol": "JUP",
+    "name": "Jupiter",
+    "address": "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN"
+  },
+  {
+    "symbol": "EURC",
+    "name": "Euro Coin",
+    "address": "0xc891eb4cbdeff6e073e859e987815ed1505c2acd"
+  },
+  {
+    "symbol": "PENGU",
+    "name": "Pudgy Penguins",
+    "address": "0x9ebe3a824ca958e4b3da772d2065518f009cba62"
+  },
+  {
+    "symbol": "WSOL",
+    "name": "Wrapped SOL",
+    "address": "0x570a5d26f7765ecb712c0924e4de545b89fd43df"
+  },
+  {
+    "symbol": "TRUMP",
+    "name": "Official Trump",
+    "address": "6p6xgHyF7AeE6TZkSmFsko444wqoP15icUSqi2jfGiPN"
+  },
+  {
+    "symbol": "JupSOL",
+    "name": "Jupiter Staked SOL",
+    "address": "jupSoLaHXQiZZTSfEWMTRRgpnyFm8f6sZdosWBjx93v"
+  },
+  {
+    "symbol": "BONK",
+    "name": "Bonk",
+    "address": "0x09199d9a5f4448d0848e4395d065e1ad9c4a1f74"
+  },
+  {
+    "symbol": "Fartcoin ",
+    "name": "Fartcoin ",
+    "address": "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump"
+  },
+  {
+    "symbol": "USX",
+    "name": "USX",
+    "address": "6FrrzDk5mQARGc1TDYoyVnSyRdds1t4PbtohCD6p3tgG"
+  },
+  {
+    "symbol": "WIF",
+    "name": "dogwifhat",
+    "address": "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm"
+  },
+  {
+    "symbol": "ZBCN",
+    "name": "Zebec Network",
+    "address": "ZBCNpuD7YMXzTHB2fhGkGi78MNsHGLRXUhRewNRm9RU"
+  },
+  {
+    "symbol": "mSOL",
+    "name": "Marinade staked SOL (mSOL)",
+    "address": "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So"
+  },
+  {
+    "symbol": "RAY",
+    "name": "Raydium",
+    "address": "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R"
+  },
+  {
+    "symbol": "BNSOL",
+    "name": "Binance Staked SOL",
+    "address": "BNso1VUJnh4zcfpZa6986Ea66P6TCp59hvtNJ8b1X85"
+  },
+  {
+    "symbol": "CASH",
+    "name": "CASH",
+    "address": "CASHx9KJUStyftLFWGvEVf59SGeG9sh5FfcnZMVPCASH"
+  },
+  {
+    "symbol": "JTO",
+    "name": "JITO",
+    "address": "jtojtomepa8beP8AuQc6eXt5FriJwfFMwQx2v2f9mCL"
+  },
+  {
+    "symbol": "MEGA",
+    "name": "MEGA",
+    "address": "0x28b7e77f82b25b95953825f1e3ea0e36c1c29861"
+  },
+  {
+    "symbol": "GRASS",
+    "name": "Grass",
+    "address": "Grass7B4RdKfBCjTKgSqnXkqjwiGvQyFbuSCUJr3XXjs"
+  },
+  {
+    "symbol": "PSOL",
+    "name": "Phantom Staked SOL",
+    "address": "pSo1f9nQXWgXibFtKf7NWYxb5enAM4qfP6UJSiXRQfL"
+  },
+  {
+    "symbol": "HNT",
+    "name": "Helium Network Token",
+    "address": "hntyVP6YFm1Hg25TN9WGLqM12b8TQmcknKrdu1oxWux"
+  },
+  {
+    "symbol": "bbSOL",
+    "name": "BybitSOL",
+    "address": "Bybit2vBJGhPF52GBdNaQfUJ6ZpThSgHBobjWZpLPb4B"
+  },
+  {
+    "symbol": "ORCA",
+    "name": "Orca",
+    "address": "orcaEKTdK7LKz57vaAYr9QeNsVEPfiu6QeMU1kektZE"
+  },
+  {
+    "symbol": "TROLL",
+    "name": "TROLL",
+    "address": "5UUH9RTDiSpq6HKS6bp4NdU9PNJpXRXuiw6ShBTBhgH2"
+  },
+  {
+    "symbol": "KMNO",
+    "name": "Kamino",
+    "address": "KMNo3nJsBXfcpJTVhZcXLW7RmTwTt4GVFE7suUBo9sS"
+  },
+  {
+    "symbol": "CRCLx",
+    "name": "Circle xStock",
+    "address": "0xfebded1b0986a8ee107f5ab1a1c5a813491deceb"
+  },
+  {
+    "symbol": "TSLAx",
+    "name": "Tesla xStock",
+    "address": "0x8ad3c73f833d3f9a523ab01476625f269aeb7cf0"
+  },
+  {
+    "symbol": "USELESS",
+    "name": "USELESS COIN",
+    "address": "0xba38b3c706f7a515ff7c8db04daa0a134ec46d2b"
+  },
+  {
+    "symbol": "POPCAT",
+    "name": "POPCAT",
+    "address": "7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr"
+  },
+  {
+    "symbol": "IO",
+    "name": "IO",
+    "address": "BZLbGTNCSFfoth2GYDtwr7e4imWzpR5jqcUuGEwr646K"
+  },
+  {
+    "symbol": "W",
+    "name": "Wormhole",
+    "address": "0xb0ffa8000886e57f86dd5264b9582b2ad87b2b91"
+  },
+  {
+    "symbol": "USDUC",
+    "name": "unstable coin",
+    "address": "0xecedb6f8108b9f7bbf499da843dced6c2bb6e270"
+  },
+  {
+    "symbol": "$BC",
+    "name": "BCGame Coin",
+    "address": "BCNT4t3rv5Hva8RnUtJUJLnxzeFAabcYp8CghC1SmWin"
+  },
+  {
+    "symbol": "DBR",
+    "name": "deBridge",
+    "address": "DBRiDgJAMsM95moTzJs7M9LnkGErpbv9v6CUR1DXnUu5"
+  },
+  {
+    "symbol": "ZEREBRO",
+    "name": "zerebro",
+    "address": "8x5VqbHA8D7NkD52uNuS5nnt3PwA8pLD34ymskeSo2Wn"
+  },
+  {
+    "symbol": "arc",
+    "name": "AI Rig Complex",
+    "address": "61V8vBaqAGMpgDQi4JcAwo1dmBGHsyhzodcPqnEVpump"
+  },
+  {
+    "symbol": "SOON",
+    "name": "SOON Token",
+    "address": "0xb9e1fd5a02d3a33b25a14d661414e6ed6954a721"
+  },
+  {
+    "symbol": "DOG",
+    "name": "Dog (Bitcoin)",
+    "address": "dog1viwbb2vWDpER5FrJ4YFG6gq6XuyFohUe9TXN65u"
+  },
+  {
+    "symbol": "PYTHIA",
+    "name": "PYTHIA",
+    "address": "CreiuhfwdWCN5mJbMJtA9bBpYQrQF2tCBuZwSPWfpump"
+  },
+  {
+    "symbol": "MSTRx",
+    "name": "MicroStrategy xStock",
+    "address": "0xae2f842ef90c0d5213259ab82639d5bbf649b08e"
+  },
+  {
+    "symbol": "MELANIA",
+    "name": "Melania Meme",
+    "address": "FUAfBo2jgks6gB4Z4LfZkqSZgzNucisEHqnNebaRxM1P"
+  },
+  {
+    "symbol": "Ban",
+    "name": "Comedian",
+    "address": "9PR7nCP9DpcUotnDPVLUBUZKu5WAYkwrCUx9wDnSpump"
+  },
+  {
+    "symbol": "TDCCP",
+    "name": "TDCCP",
+    "address": "Hg8bKz4mvs8KNj9zew1cEF9tDw1x2GViB4RFZjVEmfrD"
+  },
+  {
+    "symbol": "jellyjelly",
+    "name": "jelly-my-jelly",
+    "address": "FeR8VBqNRSUD5NtXAj2n3j1dAHkZHfyDktKuLXD4pump"
+  },
+  {
+    "symbol": "MEW",
+    "name": "cat in a dogs world",
+    "address": "MEW1gQWJ3nEXg2qgERiKu7FAFj79PHvQVREQUzScPP5"
+  },
+  {
+    "symbol": "MOODENG",
+    "name": "Moo Deng",
+    "address": "ED5nyyWEzpPPiWimP8vYm7sD7TD3LAt3Q3gRTWHzPJBY"
+  },
+  {
+    "symbol": "SPYx",
+    "name": "SP500 xStock",
+    "address": "0x90a2a4c76b5d8c0bc892a69ea28aa775a8f2dd48"
+  },
+  {
+    "symbol": "ORE",
+    "name": "ORE",
+    "address": "oreoU2P8bN6jkk3jbaiVxYnG1dCXcYxwhwyK9jSybcp"
+  },
+  {
+    "symbol": "NVDAx",
+    "name": "NVIDIA xStock",
+    "address": "0xc845b2894dbddd03858fd2d643b4ef725fe0849d"
+  },
+  {
+    "symbol": "ALCH",
+    "name": "Alchemist AI",
+    "address": "HNg5PYJmtqcmzXrv6S9zP1CDKk5BgDuyFBxbvNApump"
+  },
+  {
+    "symbol": "neet",
+    "name": "NotInEmploymentEducationTraining",
+    "address": "Ce2gx9KGXJ6C9Mp5b5x1sn9Mg87JwEbrQby4Zqo3pump"
+  },
+  {
+    "symbol": "INF",
+    "name": "Infinity",
+    "address": "5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm"
+  },
+  {
+    "symbol": "dSOL",
+    "name": "Drift Staked SOL",
+    "address": "Dso1bDeDjCQxTrWHqUUi63oBvV7Mdm6WaobLbQ7gnPQ"
+  },
+  {
+    "symbol": "Pnut ",
+    "name": "Peanut the Squirrel ",
+    "address": "2qEHjDLDLbuBgRYvsxhc5D6uDWAivNFZGan56P1tpump"
+  },
+  {
+    "symbol": "BOME",
+    "name": "BOOK OF MEME",
+    "address": "ukHH6c7mMyiWCf1b9pnWe25TSpkDDt3H5pQZgZ74J82"
+  },
+  {
+    "symbol": "swarms",
+    "name": "swarms",
+    "address": "74SBV4zDXxTRgv1pEMoECskKBkZHc2yGPnc7GYVepump"
+  },
+  {
+    "symbol": "pippin",
+    "name": "Pippin",
+    "address": "Dfh5DzRgSvvCFDoYc2ciTkMrbDfRKybA4SoFbPmApump"
+  },
+  {
+    "symbol": "QQQx",
+    "name": "Nasdaq xStock",
+    "address": "0xa753a7395cae905cd615da0b82a53e0560f250af"
+  },
+  {
+    "symbol": "BP",
+    "name": "Backpack",
+    "address": "BPxxfRCXkUVhig4HS1Lh7kZqV6SPJhzfEk4x6fVBjPCy"
+  },
+  {
+    "symbol": "GIGA",
+    "name": "GIGACHAD",
+    "address": "63LfDmNb3MQ8mw9MtZ2To9bEA2M71kZUUGq5tiJxcqj9"
+  },
+  {
+    "symbol": "ME",
+    "name": "Magic Eden",
+    "address": "MEFNBXixkEbait3xn9bkm8WsJzXtVsaJEn4c8Sam21u"
+  },
+  {
+    "symbol": "NOS",
+    "name": "Nosana",
+    "address": "nosXBVoaCTtYdLvKY6Csb4AC8JCdQKKAaWYtx2ZMoo7"
+  },
+  {
+    "symbol": "GOOGLx",
+    "name": "Alphabet xStock",
+    "address": "0xe92f673ca36c5e2efd2de7628f815f84807e803f"
+  },
+  {
+    "symbol": "GRIFFAIN",
+    "name": "test griffain.com",
+    "address": "KENJSUYLASHUMfHyy5o4Hp2FdNqZg1AsUPhfH2kYvEP"
+  },
+  {
+    "symbol": "Amiko",
+    "name": "Amiko",
+    "address": "AY1Ww6MxwC3cCiyrandHqLrp4FXvzgcwQTZpJ2FEpump"
+  },
+  {
+    "symbol": "CHILLGUY",
+    "name": "Just a chill guy",
+    "address": "Df6yfrKC8kZE3KNkrHERKzAetSxbrWeniQfyJY4Jpump"
+  },
+  {
+    "symbol": "DOOD",
+    "name": "Doodles",
+    "address": "0x722294f6c97102fb0ddb5b907c8d16bdeab3f6d9"
+  },
+  {
+    "symbol": "HUMA",
+    "name": "Huma Finance",
+    "address": "0x92516e0ddf1ddbf7fab1b79cac26689fdc5ba8e6"
+  },
+  {
+    "symbol": "GOHOME",
+    "name": "GOHOME",
+    "address": "2Wu1g2ft7qZHfTpfzP3wLdfPeV1is4EwQ3CXBfRYAciD"
+  },
+  {
+    "symbol": "DRIFT",
+    "name": "DRIFT",
+    "address": "DriFtupJYLTosbwoN8koMbEYSx54aFAVLddWsbksjwg7"
+  },
+  {
+    "symbol": "READY",
+    "name": "READY!",
+    "address": "HKJHsYJHMVK5VRyHHk5GhvzY9tBAAtPvDkZfDH6RLDTd"
+  },
+  {
+    "symbol": "VINE",
+    "name": "Vine Coin",
+    "address": "6AJcP7wuLwmRYLBNbi825wgguaPsWzPBEHcHndpRpump"
+  },
+  {
+    "symbol": "FUN",
+    "name": "Sport.fun",
+    "address": "0x16ee7ecac70d1028e7712751e2ee6ba808a7dd92"
+  },
+  {
+    "symbol": "MNGO",
+    "name": "Mango",
+    "address": "MangoCzJ36AjZyKwVj3VnYU4GTonjfVEnJmvvWaxLac"
+  },
+  {
+    "symbol": "HONEY",
+    "name": "HONEY",
+    "address": "4vMsoUT2BWatFweudnQM1xedRLfJgJ7hswhcpz4xgBTy"
+  },
+  {
+    "symbol": "Bert",
+    "name": "Bertram The Pomeranian",
+    "address": "HgBRWfYxEfvPhtqkaeymCQtHCrKE46qQ43pKe8HCpump"
+  },
+  {
+    "symbol": "GOAT",
+    "name": "Goatseus Maximus",
+    "address": "CzLSujWBLFsSjncfkh59rUFqvafWcY5tzedWJSuypump"
+  },
+  {
+    "symbol": "KLED",
+    "name": "KLEDAI",
+    "address": "1zJX5gRnjLgmTpq5sVwkq69mNDQkCemqoasyjaPW6jm"
+  },
+  {
+    "symbol": "zBTC",
+    "name": "zBTC",
+    "address": "zBTCug3er3tLyffELcvDNrKkCymbPWysGcWihESYfLg"
+  },
+  {
+    "symbol": "ACT",
+    "name": "Act I : The AI Prophecy",
+    "address": "GJAFwWjJ3vnTsrQVabjBVK2TYB1YtRCQXRDfDgUnpump"
+  },
+  {
+    "symbol": "MPLX",
+    "name": "Metaplex",
+    "address": "0x75a5863a19af60ec0098d62ed8c34cc594fb470f"
+  },
+  {
+    "symbol": "CLOUD",
+    "name": "Cloud",
+    "address": "CLoUDKc4Ane7HeQcPpE3YHnznRxhMimJ4MyaUqyHFzAu"
+  },
+  {
+    "symbol": "LAUNCHCOIN",
+    "name": "Launch Coin on Believe",
+    "address": "Ey59PH7Z4BFU4HjyKnyMdWt5GGN76KazTAwQihoUXRnk"
+  },
+  {
+    "symbol": "aura",
+    "name": "aura",
+    "address": "DtR4D9FtVoTX2569gaL837ZgrB6wNjj6tkmnX9Rdk9B2"
+  },
+  {
+    "symbol": "GLDx",
+    "name": "Gold xStock",
+    "address": "0x2380f2673c640fb67e2d6b55b44c62f0e0e69da9"
+  },
+  {
+    "symbol": "INC",
+    "name": "INCRYPT",
+    "address": "Fe5c469ADZyvnZrB8gdDsYt5eLKodaVYhYJCdunVr1nA"
+  },
+  {
+    "symbol": "sSOL",
+    "name": "Solayer SOL",
+    "address": "sSo14endRuUbvQaJS3dq36Q829a3A6BEfoeeRGJywEh"
+  },
+  {
+    "symbol": "UFD",
+    "name": "Unicorn Fart Dust",
+    "address": "eL5fUxj2J4CiQsmW85k5FG9DvuQjjUoBHoQBi2Kpump"
+  }
+]

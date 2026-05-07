@@ -8,6 +8,8 @@ import {
 } from "@solana/web3.js";
 import { getSolanaRpcUrl } from "./registry.js";
 import * as ows from "../wallet/keystore.js";
+import * as solanaTracker from "../api/solana-tracker.js";
+
 
 let _connection;
 function getConnection() {
@@ -70,6 +72,43 @@ export async function signAndBroadcastSolana(swapTxData, walletName, passphrase)
   return {
     hash: txHash,
     status: "success",
+    chain: "solana",
+  };
+}
+
+/**
+ * Sign and send a Solana Tracker (Raptor) transaction.
+ * Uses high-speed Jet TPU for broadcasting.
+ */
+export async function signAndSendRaptorTransaction(swapTxBase64, walletName, passphrase) {
+  let signedTxBytes;
+
+  try {
+    // 1. Prepare raw bytes
+    const txBuf = Buffer.from(swapTxBase64, "base64");
+    const txHex = txBuf.toString("hex");
+
+    // 2. Sign with OWS
+    const signResult = ows.signSolanaTransaction(walletName, txHex, passphrase);
+    const signatureBytes = Buffer.from(signResult.signature, "hex");
+
+    // 3. Inject signature at index 1 (standard for fee payer in serialized Solana tx)
+    signatureBytes.copy(txBuf, 1);
+    signedTxBytes = txBuf;
+  } catch (err) {
+    throw new Error(`Failed to sign Raptor transaction: ${err.message}`);
+  }
+
+  // 4. Send via high-speed Jet TPU
+  const sendResult = await solanaTracker.sendTransaction(signedTxBytes.toString("base64"));
+
+  if (!sendResult.success) {
+    throw new Error(`Raptor Send Failed: ${sendResult.error || "Unknown Error"}`);
+  }
+
+  return {
+    hash: sendResult.signature,
+    status: "pending",
     chain: "solana",
   };
 }
