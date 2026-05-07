@@ -99,14 +99,15 @@ export class TradeExecutor {
 
       console.log(`✅ [TRADE] Confirmed On-Chain! TX: ${result.hash}`);
       
-      // 4. Record trade in DB
-      await this.recordTrade(user.userId, token, raptorResult.quote, result, settings.currentMissionId);
+      // 4. Record trade in DB (Using exact event data)
+      const executionData = await this.recordTrade(user, token, raptorResult.quote, result, settings.currentMissionId);
 
       return {
         success: true,
         hash: result.hash,
         symbol: token.symbol,
-        amount: settings.defaultBuyAmount
+        amount: settings.defaultBuyAmount,
+        price: executionData.buyPrice
       };
 
     } catch (error) {
@@ -240,20 +241,29 @@ export class TradeExecutor {
     }
   }
 
-  async recordTrade(userId, token, quote, result, missionId = null) {
-    // Extract metadata directly from the Raptor quote if available
-    const decimals = quote.outputToken?.decimals || 6;
-    const symbol = quote.outputToken?.symbol || token.symbol;
+  async recordTrade(user, token, quote, result, missionId) {
+    const { symbol } = await this.getTokenMetadata(token.mint);
+    
+    // 1. Extract exact on-chain data from SwapCompleteEvent
+    const swapEvent = result.events?.find(e => e.name === 'SwapCompleteEvent')?.parsed;
+    
+    const decimals = swapEvent ? swapEvent.outputDecimals : 6;
+    const receivedAmountRaw = swapEvent ? parseFloat(swapEvent.outputAmount) : parseFloat(quote.amountOut);
+    const receivedAmount = receivedAmountRaw / Math.pow(10, decimals);
+    
+    const spentAmountSOL = swapEvent ? parseFloat(swapEvent.inputAmount) / 1e9 : parseFloat(quote.amountIn) / 1e9;
+    const actualPrice = spentAmountSOL / receivedAmount;
 
     const trade = {
-      userId,
+      userId: user.userId,
       missionId,
       mint: token.mint,
       symbol: symbol,
       decimals: decimals, 
-      buyAmount: parseFloat(quote.amountIn) / 1e9, 
-      buyPrice: token.price || (parseFloat(quote.amountIn) / 1e9 / (parseFloat(quote.amountOut) / Math.pow(10, decimals))), 
-      entryMarketCap: (token.price || (parseFloat(quote.amountIn) / 1e9 / (parseFloat(quote.amountOut) / Math.pow(10, decimals)))) * 1000000000, 
+      buyAmount: spentAmountSOL, 
+      buyPrice: actualPrice,
+      entryMarketCap: actualPrice * 1000000000, // Always use 1B Supply logic for Initial MCap
+      receivedAmount: receivedAmount,
       txHash: result.hash,
       timestamp: new Date(),
       status: 'open',
@@ -262,7 +272,9 @@ export class TradeExecutor {
     };
 
     await this.db.collection('trades').insertOne(trade);
-    console.log(`📝 [EXECUTOR] Trade recorded for ${symbol} (Decimals: ${decimals})`);
+    console.log(`📝 [EXECUTOR] Trade recorded for ${symbol} | Price: ${actualPrice.toFixed(10)} | MCap: ${(actualPrice * 1e9).toFixed(0)}`);
+    
+    return trade;
   }
 
   async recordExit(tradeId, sellPrice, status, hash, solReceived = 0) {

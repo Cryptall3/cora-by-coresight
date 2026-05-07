@@ -455,14 +455,18 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will m
               
               // Find matching trade to show PnL in the summary text from cache
               const trade = await db.collection('trades').findOne({ userId: ctx.from.id, mint, status: 'open' });
-              if (trade) {
-                const priceRecord = await db.collection('token_prices').findOne({ mint });
-                const currentPrice = priceRecord?.price || 0;
-                if (currentPrice > 0) {
-                  const pnl = ((currentPrice - trade.buyPrice) / trade.buyPrice) * 100;
-                  summary += `• **$${symbol}**: ${pnl >= 0 ? '📈 +' : '📉 '}${pnl.toFixed(1)}%\n`;
-                }
+              
+              const priceRecord = await db.collection('token_prices').findOne({ mint });
+              const currentPrice = priceRecord?.price || 0;
+              
+              if (trade && currentPrice > 0) {
+                const pnl = ((currentPrice - trade.buyPrice) / trade.buyPrice) * 100;
+                summary += `• **$${symbol}**: ${pnl >= 0 ? '📈 +' : '📉 '}${pnl.toFixed(1)}%\n`;
+              } else {
+                // Show token even if price is still syncing
+                summary += `• **$${symbol}**: ⏳ Syncing...\n`;
               }
+              
               return Markup.button.callback(`$${symbol}`, `manage_pos_${mint}`);
             };
 
@@ -474,7 +478,7 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will m
           }
           
           if (summary) {
-            msg = `📦 **Positions Hub**\n_Wallet: ${wallet.solAddress.slice(0,6)}...${wallet.solAddress.slice(-4)}_\n\n**Performance:**\n${summary}\nSelect a token to manage:`;
+            msg = `📦 **Positions Hub**\n_Wallet: ${wallet.solAddress.slice(0,6)}...${wallet.solAddress.slice(-4)}_\n\n${summary}\nSelect a token to manage:`;
           }
         }
 
