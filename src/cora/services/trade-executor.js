@@ -2,6 +2,7 @@ import { connectToDatabase } from '../db.js';
 import { UserService } from './user-service.js';
 import * as solanaTracker from '../../../cli/utils/api/solana-tracker.js';
 import { signAndSendRaptorTransaction } from '../../../cli/utils/chain/solana.js';
+import crypto from 'crypto';
 
 const userService = new UserService();
 
@@ -54,19 +55,15 @@ export class TradeExecutor {
       console.log(`📡 [RAPTOR-QUOTE] Est. ${token.symbol} Out: ${raptorResult.quote.amountOut / 1e6}`);
 
       // 2. Sign and Send via Yellowstone Jet TPU
-      // Inject the agent token into the environment for secure OWS signing
-      process.env.ZERION_AGENT_TOKEN = agentToken;
-      let result;
-      try {
-        result = await signAndSendRaptorTransaction(
-          raptorResult.swapTransaction,
-          wallet.walletName,
-          null // Passphrase handled by agent token
-        );
-      } finally {
-        // Always clean up the agent token
-        delete process.env.ZERION_AGENT_TOKEN;
-      }
+      // Compute the deterministic passphrase used by OWS to decrypt the local wallet file
+      const serverSecret = process.env.ZERION_API_KEY || 'default_secret';
+      const passphrase = crypto.createHmac('sha256', serverSecret).update(user.userId.toString() + wallet.id).digest('hex');
+
+      const result = await signAndSendRaptorTransaction(
+        raptorResult.swapTransaction,
+        wallet.walletName,
+        passphrase
+      );
 
       console.log(`✅ [TRADE] Success! TX: ${result.hash}`);
       
@@ -132,17 +129,14 @@ export class TradeExecutor {
       console.log(`📝 [RAPTOR-QUOTE] Found exit route for ${trade.symbol}. Est. SOL: ${raptorResult.quote.amountOut / 1e9}`);
 
       // 3. Sign and Send
-      process.env.ZERION_AGENT_TOKEN = agentToken;
-      let result;
-      try {
-        result = await signAndSendRaptorTransaction(
-          raptorResult.swapTransaction,
-          wallet.walletName,
-          null
-        );
-      } finally {
-        delete process.env.ZERION_AGENT_TOKEN;
-      }
+      const serverSecret = process.env.ZERION_API_KEY || 'default_secret';
+      const passphrase = crypto.createHmac('sha256', serverSecret).update(user.userId.toString() + wallet.id).digest('hex');
+
+      const result = await signAndSendRaptorTransaction(
+        raptorResult.swapTransaction,
+        wallet.walletName,
+        passphrase
+      );
 
       if (result.hash) {
         console.log(`✅ [SELL] Success! TX: ${result.hash}`);
