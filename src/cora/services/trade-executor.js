@@ -250,10 +250,10 @@ export class TradeExecutor {
       missionId,
       mint: token.mint,
       symbol: symbol,
-      decimals: decimals, // Store decimals so auto-exit doesn't need API calls
+      decimals: decimals, 
       buyAmount: parseFloat(quote.amountIn) / 1e9, 
-      buyPrice: token.price || 0,
-      receivedAmount: parseFloat(quote.amountOut) / Math.pow(10, decimals),
+      buyPrice: token.price || (parseFloat(quote.amountIn) / 1e9 / (parseFloat(quote.amountOut) / Math.pow(10, decimals))), // Calculate entry price if not provided
+      entryMarketCap: token.marketCap || 'N/A', // Store market cap at time of snipe
       txHash: result.hash,
       timestamp: new Date(),
       status: 'open',

@@ -427,7 +427,7 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will m
         const profile = await userService.getProfile(ctx.from.id);
         const wallet = profile.wallets[0];
         
-        ctx.answerCbQuery('Fetching positions... ⏳');
+        ctx.answerCbQuery('Scanning Portfolio... 🔎');
         const { getPositions } = await import('../../../cli/utils/api/client.js');
         const response = await getPositions(wallet.solAddress, { chainId: 'solana' });
         
@@ -436,30 +436,30 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will m
           return info && info.symbol !== 'SOL' && p.attributes.quantity.float > 0.000001;
         });
 
-        let msg = `📦 **Live Positions**\n_Wallet: ${wallet.solAddress.slice(0,6)}...${wallet.solAddress.slice(-4)}_\n\n`;
+        let msg = `📦 **Positions Hub**\n_Wallet: ${wallet.solAddress.slice(0,6)}...${wallet.solAddress.slice(-4)}_\n\nSelect a token to manage your position, view PnL, and see trade details:`;
         const buttons = [];
 
         if (positions.length === 0) {
-          msg += '_No active token positions found._';
+          msg = `📦 **Positions Hub**\n\n_No active positions found in this wallet._`;
         } else {
-          positions.forEach(p => {
-            const attr = p.attributes;
-            const info = attr.fungible_info;
-            const mint = info.implementations.find(i => i.chain_id === 'solana')?.address;
+          // Create buttons for each token (2 per row for better UX)
+          for (let i = 0; i < positions.length; i += 2) {
+            const row = [];
+            const p1 = positions[i];
+            const mint1 = p1.attributes.fungible_info.implementations.find(imm => imm.chain_id === 'solana')?.address;
+            row.push(Markup.button.callback(`$${p1.attributes.fungible_info.symbol}`, `manage_pos_${mint1}`));
             
-            msg += `• **${info.symbol}**: \`${attr.quantity.float.toFixed(4)}\` (~$${attr.value?.toFixed(2) || '0'})\n`;
-            
-            if (mint) {
-              buttons.push([
-                Markup.button.callback(`➕ Buy ${info.symbol}`, `pos_buy_menu_${mint}`),
-                Markup.button.callback(`🔴 Sell ${info.symbol}`, `pos_sell_menu_${mint}`)
-              ]);
+            if (positions[i+1]) {
+              const p2 = positions[i+1];
+              const mint2 = p2.attributes.fungible_info.implementations.find(imm => imm.chain_id === 'solana')?.address;
+              row.push(Markup.button.callback(`$${p2.attributes.fungible_info.symbol}`, `manage_pos_${mint2}`));
             }
-          });
+            buttons.push(row);
+          }
         }
 
-        buttons.push([Markup.button.callback('🔄 Refresh', 'positions_hub')]);
-        buttons.push([Markup.button.callback('⬅️ Back', 'main_menu')]);
+        buttons.push([Markup.button.callback('🔄 Refresh List', 'positions_hub')]);
+        buttons.push([Markup.button.callback('⬅️ Back to Hub', 'main_menu')]);
 
         ctx.editMessageText(msg, {
           parse_mode: 'Markdown',
@@ -468,6 +468,66 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will m
       } catch (err) {
         console.error('❌ [BOT] Positions Error:', err);
         ctx.reply('⚠️ Error loading positions.');
+      }
+    });
+
+    this.bot.action(/^manage_pos_(.+)$/, async (ctx) => {
+      const mint = ctx.match[1];
+      try {
+        const profile = await userService.getProfile(ctx.from.id);
+        const wallet = profile.wallets[0];
+        
+        // 1. Fetch Live Data from ST and Zerion
+        const { getPositions } = await import('../../../cli/utils/api/client.js');
+        const response = await getPositions(wallet.solAddress, { chainId: 'solana' });
+        const pos = response.data.find(p => p.attributes.fungible_info?.implementations?.some(i => i.address === mint));
+        
+        const priceRes = await fetch(`https://api.solanatracker.io/price?tokenAddress=${mint}`);
+        const priceData = await priceRes.json();
+        const currentPrice = priceData.price || 0;
+        
+        // 2. Get Entry Data from our Database
+        const db = await (await import('../db.js')).connectToDatabase();
+        const trade = await db.collection('trades').findOne({ userId: ctx.from.id, mint, status: 'open' });
+
+        const info = pos?.attributes?.fungible_info || { symbol: 'TOKEN', name: 'Unknown Token' };
+        const quantity = pos?.attributes?.quantity?.float || 0;
+        const currentValue = pos?.attributes?.value || 0;
+
+        let pnlStr = "N/A";
+        if (trade && currentPrice > 0) {
+          const pnl = ((currentPrice - trade.buyPrice) / trade.buyPrice) * 100;
+          pnlStr = `${pnl >= 0 ? '🟢 +' : '🔴 '}${pnl.toFixed(2)}%`;
+        }
+
+        const msg = `
+💎 **Position: ${info.name} ($${info.symbol})**
+\`${mint}\`
+
+**📊 Performance:**
+• PnL: **${pnlStr}**
+• Current Value: \`$${currentValue.toFixed(2)}\`
+• Holding: \`${quantity.toFixed(4)} ${info.symbol}\`
+
+**📈 Trade Entry:**
+• Entry Price: \`$${trade?.buyPrice?.toFixed(10) || 'N/A'}\`
+• Entry SOL: \`${trade?.buyAmount?.toFixed(3) || 'N/A'} SOL\`
+• Initial Market Cap: \`${trade?.entryMarketCap || 'N/A'}\`
+
+**Status:** ⏳ **MONITORING**
+        `;
+
+        ctx.editMessageText(msg, {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('➕ Buy More', `pos_buy_menu_${mint}`), Markup.button.callback('🔴 Sell Position', `pos_sell_menu_${mint}`)],
+            [Markup.button.callback('🔄 Refresh Stats', `manage_pos_${mint}`)],
+            [Markup.button.callback('⬅️ Back to Positions', 'positions_hub')]
+          ])
+        });
+      } catch (err) {
+        console.error('❌ [BOT] Drill-down error:', err);
+        ctx.answerCbQuery('⚠️ Error loading token details.');
       }
     });
 
