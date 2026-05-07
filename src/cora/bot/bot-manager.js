@@ -597,7 +597,7 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will m
       const amount = parseFloat(ctx.match[2]);
       const profile = await userService.getProfile(ctx.from.id);
       
-      ctx.reply(`⏳ **Buying ${amount} SOL more...** (via ST)`);
+      ctx.reply(`⏳ **Buying ${amount} SOL more...**`);
       
       // Temporarily override default buy amount for this execution
       const tempProfile = { ...profile, settings: { ...profile.settings, defaultBuyAmount: amount } };
@@ -617,7 +617,7 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will m
       const percentage = parseInt(ctx.match[2]);
       const profile = await userService.getProfile(ctx.from.id);
       
-      ctx.reply(`⏳ **Selling ${percentage}%...** (via ST)`);
+      ctx.reply(`⏳ **Selling ${percentage}%...**`);
       
       const executor = this.executor;
       const trade = { mint, symbol: 'TOKEN' };
