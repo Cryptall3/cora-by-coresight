@@ -65,9 +65,38 @@ export class TradeExecutor {
         passphrase
       );
 
-      console.log(`✅ [TRADE] Success! TX: ${result.hash}`);
+      // 3. Confirm Transaction Status On-Chain
+      console.log(`⏳ [EXECUTOR] Tx broadcasted (${result.hash}). Verifying on-chain status...`);
+      let txConfirmed = false;
+      let txSuccess = false;
+      for (let i = 0; i < 15; i++) { // Poll every 2s for 30s
+        await new Promise(r => setTimeout(r, 2000));
+        try {
+          const statusResult = await solanaTracker.getTransactionStatus(result.hash);
+          if (statusResult.status !== "pending") {
+            txConfirmed = true;
+            if (statusResult.status === "failed" || statusResult.error || (statusResult.meta && statusResult.meta.err)) {
+              txSuccess = false;
+            } else {
+              txSuccess = true;
+            }
+            break;
+          }
+        } catch (e) {
+          // Ignore transient API errors while polling
+        }
+      }
+
+      if (!txConfirmed) {
+        throw new Error("Transaction verification timed out. It may have been dropped.");
+      }
+      if (!txSuccess) {
+        throw new Error("Transaction reverted on-chain (likely Slippage Exceeded).");
+      }
+
+      console.log(`✅ [TRADE] Confirmed On-Chain! TX: ${result.hash}`);
       
-      // 3. Record trade in DB
+      // 4. Record trade in DB
       await this.recordTrade(user.userId, token, raptorResult.quote, result, settings.currentMissionId);
 
       return {
@@ -138,15 +167,38 @@ export class TradeExecutor {
         passphrase
       );
 
-      if (result.hash) {
-        console.log(`✅ [SELL] Success! TX: ${result.hash}`);
-        const solReceived = raptorResult.quote.amountOut / 1e9;
-        const sellPrice = solReceived / balance; 
-        await this.recordExit(trade._id, sellPrice, 'closed', result.hash, solReceived);
-        return { success: true, hash: result.hash };
-      } else {
-        throw new Error('Sell swap failed to return hash');
+      // 4. Confirm Transaction Status On-Chain
+      console.log(`⏳ [EXECUTOR] Sell Tx broadcasted (${result.hash}). Verifying on-chain status...`);
+      let txConfirmed = false;
+      let txSuccess = false;
+      for (let i = 0; i < 15; i++) { 
+        await new Promise(r => setTimeout(r, 2000));
+        try {
+          const statusResult = await solanaTracker.getTransactionStatus(result.hash);
+          if (statusResult.status !== "pending") {
+            txConfirmed = true;
+            if (statusResult.status === "failed" || statusResult.error || (statusResult.meta && statusResult.meta.err)) {
+              txSuccess = false;
+            } else {
+              txSuccess = true;
+            }
+            break;
+          }
+        } catch (e) {}
       }
+
+      if (!txConfirmed) {
+        throw new Error("Sell transaction verification timed out. It may have been dropped.");
+      }
+      if (!txSuccess) {
+        throw new Error("Sell transaction reverted on-chain (likely Slippage Exceeded).");
+      }
+
+      console.log(`✅ [SELL] Confirmed On-Chain! TX: ${result.hash}`);
+      const solReceived = raptorResult.quote.amountOut / 1e9;
+      const sellPrice = solReceived / balance; 
+      await this.recordExit(trade._id, sellPrice, 'closed', result.hash, solReceived);
+      return { success: true, hash: result.hash };
 
     } catch (error) {
       console.error(`❌ [EXECUTOR] Raptor Sell failed for user ${user.userId}:`, error.message);

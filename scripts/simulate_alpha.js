@@ -29,18 +29,18 @@ async function simulateAlpha() {
 
     // Parse the CHIMP data into the expected format
     const mockToken = {
-      symbol: 'USDC',
-      name: 'USD Coin',
-      mint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
-      marketCap: 1000000000,
-      liquidity: 1000000,
+      symbol: 'TEST',
+      name: 'Test Token',
+      mint: 'GnTGvD3cTNf6SjAhtEUPAKubRkgzjkC8Et2q2BwPpump',
+      marketCap: 10000,
+      liquidity: 1000,
       buy_amount: 0.018,
-      holders: 100000,
+      holders: 100,
       lpBurn: 100,
       devPercentage: 0.0,
       sniperPercentage: 0.0,
       top10: 1.0,
-      market: 'raydium',
+      market: 'pumpfun',
       createdAt: new Date(),
       isSimulated: true
     };
