@@ -25,7 +25,7 @@ export async function quoteAndSwap({
     inputMint,
     outputMint,
     amount: parseInt(amount.toString()), // Must be lamports (integer)
-    slippageBps: slippage ? (parseFloat(slippage) * 100).toString() : "dynamic",
+    slippageBps: (slippage === 'auto' || !slippage) ? "dynamic" : (parseFloat(slippage) * 100).toString(),
     txVersion: "V0", // Must be uppercase 'V0' or 'LEGACY'
     priorityFee,
     wrapUnwrapSol: true,

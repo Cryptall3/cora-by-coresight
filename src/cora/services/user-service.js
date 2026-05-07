@@ -147,7 +147,7 @@ export class UserService {
           defaultBuyAmount: 0.1,
           tpPercent: 100,
           slPercent: 50,
-          slippage: 1.0,
+          slippage: 'auto',
           autoExit: false,
           missionDuration: null, // Default: Indefinite
           snipeExpiration: null,

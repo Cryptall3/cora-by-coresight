@@ -114,10 +114,13 @@ What would you like to do with this wallet?
     });
 
     this.bot.action('tactics_settings', async (ctx) => {
-      const profile = await userService.getProfile(ctx.from.id);
-      const settings = profile.settings;
+      try {
+        const profile = await userService.getProfile(ctx.from.id);
+        const settings = profile.settings;
+        
+        const slipDisplay = settings.slippage === 'auto' ? 'Auto (Dynamic)' : `${settings.slippage}%`;
 
-      const tacticsMsg = `
+        let msg = `
 ⚙️ **Trading Tactics**
 
 Define Cora's rules of engagement. These settings apply to all autonomous trades.
@@ -125,23 +128,26 @@ Define Cora's rules of engagement. These settings apply to all autonomous trades
 💰 **Buy Amount:** \`${settings.defaultBuyAmount} SOL\`
 📈 **Take Profit:** \`+${settings.tpPercent}%\`
 📉 **Stop Loss:** \`-${settings.slPercent}%\`
-🌊 **Slippage:** \`${settings.slippage}%\`
+🌊 **Slippage:** \`${slipDisplay}\`
 ⏱️ **Mission Window:** \`${settings.missionDuration ? (settings.missionDuration / 3600000) + 'h' : '♾️ Indefinite'}\`
 🔥 **Auto-Exit:** ${settings.autoExit ? '✅ ENABLED' : '❌ DISABLED'}
 
 *Auto-Exit ensures Cora sells automatically when TP or SL targets are hit.*
-      `;
+        `;
 
-      ctx.editMessageText(tacticsMsg, {
-        parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard([
-          [Markup.button.callback('💰 Buy Amount', 'set_buy'), Markup.button.callback('🌊 Slippage', 'set_slippage')],
-          [Markup.button.callback('📈 TP %', 'set_tp'), Markup.button.callback('📉 SL %', 'set_sl')],
-          [Markup.button.callback('⏱️ Mission Window', 'set_mission')],
-          [Markup.button.callback(`${settings.autoExit ? '🔴 Disable' : '🟢 Enable'} Auto-Exit`, 'toggle_auto_exit')],
-          [Markup.button.callback('⬅️ Back', 'main_menu')]
-        ])
-      });
+        ctx.editMessageText(msg, {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('💰 Buy Amount', 'set_buy'), Markup.button.callback('🌊 Slippage', 'set_slippage')],
+            [Markup.button.callback('📈 TP %', 'set_tp'), Markup.button.callback('📉 SL %', 'set_sl')],
+            [Markup.button.callback('⏱️ Mission Window', 'set_mission')],
+            [Markup.button.callback(`${settings.autoExit ? '🔴 Disable' : '🟢 Enable'} Auto-Exit`, 'toggle_auto_exit')],
+            [Markup.button.callback('⬅️ Back', 'main_menu')]
+          ])
+        });
+      } catch (err) {
+        ctx.answerCbQuery('Error loading tactics.');
+      }
     });
 
     this.bot.action('set_mission', async (ctx) => {
@@ -200,13 +206,14 @@ Define Cora's rules of engagement. These settings apply to all autonomous trades
       });
     });
 
-    this.bot.action('set_slippage', async (ctx) => {
-      ctx.editMessageText('🌊 **Set Slippage**\n\nSelect a preset or type a custom %:', {
+    this.bot.action('set_slippage', (ctx) => {
+      ctx.editMessageText('⚡️ **Set Slippage**\n\nSelect a preset, use Auto for dynamic adjusting, or type a custom %:', {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
-          [Markup.button.callback('0.5%', 'slip_0.5'), Markup.button.callback('1.0%', 'slip_1.0')],
-          [Markup.button.callback('3.0%', 'slip_3.0'), Markup.button.callback('5.0%', 'slip_5.0')],
-          [Markup.button.callback('✏️ Custom Slippage %', 'custom_slip_prompt')],
+          [Markup.button.callback('🤖 Auto (Dynamic)', 'slip_auto')],
+          [Markup.button.callback('10%', 'slip_10'), Markup.button.callback('25%', 'slip_25')],
+          [Markup.button.callback('50%', 'slip_50'), Markup.button.callback('75%', 'slip_75')],
+          [Markup.button.callback('✏️ Custom %', 'slip_custom')],
           [Markup.button.callback('⬅️ Back', 'tactics_settings')]
         ])
       });
@@ -258,11 +265,21 @@ Define Cora's rules of engagement. These settings apply to all autonomous trades
     });
 
     this.bot.action(/^slip_(.+)$/, async (ctx) => {
-      const value = parseFloat(ctx.match[1]);
+      const val = ctx.match[1];
       const profile = await userService.getProfile(ctx.from.id);
-      await userService.updateSettings(ctx.from.id, { ...profile.settings, slippage: value });
-      ctx.answerCbQuery(`Slippage set to ${value}% ✅`);
-      this.bot.handleUpdate({ ...ctx.update, callback_query: { ...ctx.callbackQuery, data: 'tactics_settings' } });
+      
+      if (val === 'custom') {
+        this.userStates.set(ctx.from.id, { action: 'await_custom_slip' });
+        ctx.reply('✍️ Send me the slippage percentage (e.g., 25.5):');
+      } else if (val === 'auto') {
+        await userService.updateSettings(ctx.from.id, { ...profile.settings, slippage: 'auto' });
+        ctx.reply(`✅ **Slippage set to Auto (Dynamic)**`, { parse_mode: 'Markdown' });
+        this.sendDashboard(ctx);
+      } else {
+        await userService.updateSettings(ctx.from.id, { ...profile.settings, slippage: parseFloat(val) });
+        ctx.reply(`✅ **Slippage set to ${val}%**`, { parse_mode: 'Markdown' });
+        this.sendDashboard(ctx);
+      }
     });
 
     this.bot.action('toggle_auto_exit', async (ctx) => {
@@ -311,6 +328,7 @@ Define Cora's rules of engagement. These settings apply to all autonomous trades
         }
 
         const toggleLabel = settings.snipeEnabled ? '⏹️ Stop Sniper' : '🚀 Start Sniper';
+        const slipDisplay = settings.slippage === 'auto' ? 'Auto' : `${settings.slippage}%`;
 
         const msg = `
 🎯 **Alpha Sniper Configuration**
@@ -323,7 +341,7 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will m
 💰 **Buy Amount:** \`${settings.defaultBuyAmount || 0.1} SOL\`
 📈 **Take Profit:** \`+${settings.tpPercent || 100}%\`
 📉 **Stop Loss:** \`-${settings.slPercent || 50}%\`
-🌊 **Slippage:** \`${settings.slippage || 1.0}%\`
+🌊 **Slippage:** \`${slipDisplay}\`
 🔄 **Auto-Exit:** \`${settings.autoExit ? 'ENABLED' : 'DISABLED'}\`
 ⏱️ **Window:** \`${settings.missionDuration ? (settings.missionDuration / 3600000) + 'h' : 'Indefinite'}\`
 
