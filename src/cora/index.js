@@ -1,7 +1,6 @@
 import { BotManager } from './bot/bot-manager.js';
 import { AlphaListener } from './services/alpha-listener.js';
 import { AutoExitService } from './services/auto-exit-service.js';
-import { PriceMonitorService } from './services/price-monitor-service.js';
 import http from 'http';
 import dotenv from 'dotenv';
 
@@ -10,13 +9,9 @@ dotenv.config();
 const botManager = new BotManager();
 const alphaListener = new AlphaListener();
 const autoExitService = new AutoExitService();
-const priceMonitorService = new PriceMonitorService();
 
 async function startCora() {
   console.log('🤖 Starting Cora Agent Service...');
-
-  // 1. Start the Global Price Monitor (Heartbeat)
-  await priceMonitorService.start();
 
   // 1. Start the Telegram Bot Interface
   await botManager.start();

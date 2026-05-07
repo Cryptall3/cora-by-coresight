@@ -465,14 +465,16 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will m
               });
               
               const avgEntryPrice = totalSpentSOL / totalTokensReceived;
-              const priceRecord = await db.collection('token_prices').findOne({ mint });
-              const currentPrice = priceRecord?.price || 0;
+              // FETCH PRICE ON-DEMAND (No background sync)
+              const priceRes = await fetch(`https://api.solanatracker.io/price?tokenAddress=${mint}`).catch(() => null);
+              const priceData = priceRes ? await priceRes.json() : null;
+              const currentPrice = priceData?.price || 0;
               
               if (trades.length > 0 && currentPrice > 0) {
                 const pnl = ((currentPrice - avgEntryPrice) / avgEntryPrice) * 100;
                 summary += `• <b>$${symbol}</b>: ${pnl >= 0 ? '📈 +' : '📉 '}${pnl.toFixed(1)}% (Avg: <code>${avgEntryPrice.toFixed(10)}</code>)\n`;
               } else {
-                summary += `• <b>$${symbol}</b>: ⏳ Syncing...\n`;
+                summary += `• <b>$${symbol}</b>: ⚠️ Price Error\n`;
               }
               
               return Markup.button.callback(`$${symbol}`, `manage_pos_${mint}`);
@@ -514,10 +516,10 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will m
         const response = await getPositions(wallet.solAddress, { chainId: 'solana' });
         const pos = response.data.find(p => p.attributes.fungible_info?.implementations?.some(i => i.address === mint));
         
-        // 2. Fetch Live Price from our Global Cache
-        const db = await (await import('../db.js')).connectToDatabase();
-        const priceRecord = await db.collection('token_prices').findOne({ mint });
-        const currentPrice = priceRecord?.price || 0;
+        // 2. Fetch Live Price On-Demand
+        const priceRes = await fetch(`https://api.solanatracker.io/price?tokenAddress=${mint}`).catch(() => null);
+        const priceData = priceRes ? await priceRes.json() : null;
+        const currentPrice = priceData?.price || 0;
         
         // 3. Calculate Weighted Average from Database
         const trades = await db.collection('trades').find({ userId: ctx.from.id, mint, status: 'open' }).toArray();
