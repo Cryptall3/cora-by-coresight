@@ -389,28 +389,28 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will m
         const history = await tradeService.getTradeHistory(ctx.from.id, 5);
 
         let msg = `
-📈 **PnL Dashboard**
+<b>📈 PnL Dashboard</b>
 
-**Performance Summary:**
-• Total Trades: \`${stats.totalTrades}\`
-• Win Rate: \`${stats.winRate.toFixed(1)}%\` (${stats.winCount}W / ${stats.lossCount}L)
-• Total Profit: \`${stats.totalPnL >= 0 ? '+' : ''}${stats.totalPnL.toFixed(2)}%\`
-• Total Volume: \`${stats.totalVolume.toFixed(2)} SOL\`
+<b>Performance Summary:</b>
+• Total Trades: <code>${stats.totalTrades}</code>
+• Win Rate: <code>${stats.winRate.toFixed(1)}%</code> (${stats.winCount}W / ${stats.lossCount}L)
+• Total Profit: <code>${stats.totalPnL >= 0 ? '+' : ''}${stats.totalPnL.toFixed(2)}%</code>
+• Total Volume: <code>${stats.totalVolume.toFixed(2)} SOL</code>
 
-**Recent Activity:**
+<b>Recent Activity:</b>
 `;
 
         if (history.length === 0) {
           msg += `_No trades executed yet._\n`;
         } else {
           history.forEach(t => {
-            const pnlStr = t.status === 'open' ? '⏳ OPEN' : `${t.pnl >= 0 ? '🟢' : '🔴'} ${t.pnl.toFixed(2)}%`;
-            msg += `• **${t.symbol}**: ${pnlStr} (\`${t.buyAmount} SOL\`)\n`;
+            const pnlStr = t.status === 'open' ? '⏳ OPEN' : `<b>${t.pnl >= 0 ? '🟢' : '🔴'} ${t.pnl.toFixed(2)}%</b>`;
+            msg += `• <b>${t.symbol}</b>: ${pnlStr} (<code>${t.buyAmount} SOL</code>)\n`;
           });
         }
 
-        ctx.editMessageText(msg, {
-          parse_mode: 'Markdown',
+        ctx.editMessageText(msg.trim(), {
+          parse_mode: 'HTML',
           ...Markup.inlineKeyboard([
             [Markup.button.callback('🔄 Refresh', 'pnl_dashboard')],
             [Markup.button.callback('⬅️ Back', 'main_menu')]
@@ -453,18 +453,26 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will m
               const symbol = info.symbol;
               const mint = info.implementations.find(imm => imm.chain_id === 'solana')?.address;
               
-              // Find matching trade to show PnL in the summary text from cache
-              const trade = await db.collection('trades').findOne({ userId: ctx.from.id, mint, status: 'open' });
+              // Calculate Weighted Average Price for all OPEN trades for this user/mint
+              const trades = await db.collection('trades').find({ userId: ctx.from.id, mint, status: 'open' }).toArray();
               
+              let totalSpentSOL = 0;
+              let totalTokensReceived = 0;
+              
+              trades.forEach(t => {
+                totalSpentSOL += t.buyAmount || 0;
+                totalTokensReceived += t.receivedAmount || (t.buyAmount / t.buyPrice);
+              });
+              
+              const avgEntryPrice = totalSpentSOL / totalTokensReceived;
               const priceRecord = await db.collection('token_prices').findOne({ mint });
               const currentPrice = priceRecord?.price || 0;
               
-              if (trade && currentPrice > 0) {
-                const pnl = ((currentPrice - trade.buyPrice) / trade.buyPrice) * 100;
-                summary += `• **$${symbol}**: ${pnl >= 0 ? '📈 +' : '📉 '}${pnl.toFixed(1)}%\n`;
+              if (trades.length > 0 && currentPrice > 0) {
+                const pnl = ((currentPrice - avgEntryPrice) / avgEntryPrice) * 100;
+                summary += `• <b>$${symbol}</b>: ${pnl >= 0 ? '📈 +' : '📉 '}${pnl.toFixed(1)}% (Avg: <code>${avgEntryPrice.toFixed(10)}</code>)\n`;
               } else {
-                // Show token even if price is still syncing
-                summary += `• **$${symbol}**: ⏳ Syncing...\n`;
+                summary += `• <b>$${symbol}</b>: ⏳ Syncing...\n`;
               }
               
               return Markup.button.callback(`$${symbol}`, `manage_pos_${mint}`);
@@ -511,23 +519,29 @@ ${settings.snipeEnabled ? '⚠️ **CORA IS CURRENTLY SNIPING.**' : 'Cora will m
         const priceRecord = await db.collection('token_prices').findOne({ mint });
         const currentPrice = priceRecord?.price || 0;
         
-        // 3. Get Entry Data from our Database
-        const trade = await db.collection('trades').findOne({ userId: ctx.from.id, mint, status: 'open' });
+        // 3. Calculate Weighted Average from Database
+        const trades = await db.collection('trades').find({ userId: ctx.from.id, mint, status: 'open' }).toArray();
+        let totalSpentSOL = 0;
+        let totalTokensReceived = 0;
+        trades.forEach(t => {
+          totalSpentSOL += t.buyAmount || 0;
+          totalTokensReceived += t.receivedAmount || (t.buyAmount / t.buyPrice);
+        });
+        const avgEntryPrice = totalSpentSOL / totalTokensReceived;
+        const initialMCap = avgEntryPrice * 1000000000;
 
         const info = pos?.attributes?.fungible_info || { symbol: 'TOKEN', name: 'Unknown Token' };
         const quantity = pos?.attributes?.quantity?.float || 0;
         const currentValue = pos?.attributes?.value || 0;
 
         let pnlStr = "N/A";
-        if (trade && currentPrice > 0) {
-          const pnl = ((currentPrice - trade.buyPrice) / trade.buyPrice) * 100;
+        if (trades.length > 0 && currentPrice > 0) {
+          const pnl = ((currentPrice - avgEntryPrice) / avgEntryPrice) * 100;
           pnlStr = `${pnl >= 0 ? '🟢 +' : '🔴 '}${pnl.toFixed(2)}%`;
         }
 
         // 3. Estimate Live Market Cap from our Cache (assuming 1B supply)
         const currentMCap = currentPrice * 1000000000;
-
-        const initialMCap = trade?.entryMarketCap || 0;
 
         const formatMCap = (val) => {
           if (!val || val === 0) return 'N/A';

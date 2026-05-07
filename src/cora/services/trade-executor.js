@@ -56,7 +56,7 @@ export class TradeExecutor {
         feeFromInput: true // CRITICAL: Take fee in SOL to avoid ATA reverts
       });
 
-      console.log(`📡 [RAPTOR-QUOTE] Est. Out: ${raptorResult.quote.amountOut / 1e6} | Impact: ${raptorResult.quote.priceImpact}%`);
+      // Raptor quote debug log removed
 
       // 2. Sign and Send via Yellowstone Jet TPU
       // Compute the deterministic passphrase used by OWS to decrypt the local wallet file
@@ -85,7 +85,7 @@ export class TradeExecutor {
         } catch (e) {}
       }
 
-      console.log(`📊 [FULL-STATUS] ${JSON.stringify(txStatusData, null, 2)}`);
+      // txStatusData logs removed for cleanliness
 
       if (!txConfirmed) {
         throw new Error("Transaction verification timed out. It may have been dropped.");
