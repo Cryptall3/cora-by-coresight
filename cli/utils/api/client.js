@@ -92,7 +92,7 @@ export async function getPositions(address, options = {}) {
     if (options.chainId) params["filter[chain_ids]"] = options.chainId;
   }
   
-  return fetchAPI(`/wallets/${encodeURIComponent(address)}/positions/`, params, options.auth);
+  return fetchAPI(`/wallets/${encodeURIComponent(address)}/positions`, params, options.auth);
 }
 
 export async function getPnl(address, options = {}) {
