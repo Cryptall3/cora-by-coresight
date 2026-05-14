@@ -127,6 +127,12 @@ export class AlphaListener {
             return val.toFixed(0);
           };
 
+          const tpPct = user.settings?.tpPercent || 100;
+          const slPct = user.settings?.slPercent || 50;
+          const footerStr = result.engine === 'jupiter'
+            ? `⚡️ <b>Jupiter Trigger Activated:</b> Fully automated on-chain OTOCO limits locked at <b>+${tpPct}% TP</b> and <b>-${slPct}% SL</b>.`
+            : `<i>Cora is now monitoring this position for Take Profit (+${tpPct}%) and Stop Loss (-${slPct}%).</i>`;
+
           const msg = `
 🚀 <b>Alpha Sniper: Position Opened!</b>
 
@@ -136,7 +142,7 @@ export class AlphaListener {
 <b>Entry MC:</b> <b>$${formatMCap(entryMC)}</b>
 <b>TX:</b> <a href="https://solscan.io/tx/${result.hash}">View on Solscan</a>
 
-<i>Cora is now monitoring this position for Take Profit (+${user.settings?.tpPercent || 100}%) and Stop Loss (-${user.settings?.slPercent || 50}%).</i>
+${footerStr}
           `;
           await this.bot.telegram.sendMessage(user.userId, msg, { 
             parse_mode: 'HTML',

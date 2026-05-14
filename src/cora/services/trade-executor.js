@@ -2,6 +2,10 @@ import { connectToDatabase } from '../db.js';
 import { UserService } from './user-service.js';
 import * as solanaTracker from '../../../cli/utils/api/solana-tracker.js';
 import { signAndSendRaptorTransaction } from '../../../cli/utils/chain/solana.js';
+import * as jupiter from '../../../cli/utils/api/jupiter.js';
+import * as ows from '../../../cli/utils/wallet/keystore.js';
+import { Connection, PublicKey } from '@solana/web3.js';
+import { Buffer } from 'node:buffer';
 import crypto from 'crypto';
 
 const userService = new UserService();
@@ -18,7 +22,25 @@ export class TradeExecutor {
   }
 
   /**
-   * Execute a snipe for a specific user and token
+   * Check if a token mint uses the Token-2022 program.
+   */
+  async isToken2022Program(mintAddress) {
+    try {
+      const rpcUrl = process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com";
+      const connection = new Connection(rpcUrl);
+      const info = await connection.getAccountInfo(new PublicKey(mintAddress));
+      if (info && info.owner.toString() === "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb") {
+        return true;
+      }
+    } catch (err) {
+      console.warn(`⚠️ [EXECUTOR] Could not verify program ID for ${mintAddress}:`, err.message);
+    }
+    return false;
+  }
+
+  /**
+   * Execute a snipe for a specific user and token using Jupiter Trigger V2 OTOCO flow.
+   * Automatically falls back to Raptor for Token-2022 compatibility.
    */
   async executeSnipe(user, token) {
     try {
@@ -35,10 +57,124 @@ export class TradeExecutor {
         throw new Error(`User ${user.userId} has no agent token for wallet ${wallet.walletName}`);
       }
 
-      console.log(`🚀 [EXECUTOR] Starting Raptor Snipe | User: ${user.userId} | Token: ${token.symbol}`);
+      console.log(`🚀 [EXECUTOR] Starting Trade Mission | User: ${user.userId} | Token: ${token.symbol}`);
+
+      // Perform pre-flight check for Token-2022 compatibility
+      const isT2022 = await this.isToken2022Program(token.mint);
+      if (isT2022) {
+        console.log(`⚠️ [EXECUTOR] Token-2022 detected for ${token.symbol}. Falling back to legacy Raptor High-Speed Sniping.`);
+        return await this.executeRaptorSnipe(user, token, activeProfile, wallet, settings);
+      }
+
+      console.log(`⚡️ [EXECUTOR] Standard SPL Token detected. Initiating Jupiter V2 Trigger OTOCO Flow...`);
+
+      // 1. Derive passphrase for OWS signing
+      const serverSecret = process.env.ZERION_API_KEY || 'default_secret';
+      const passphrase = crypto.createHmac('sha256', serverSecret).update(user.userId.toString() + wallet.id).digest('hex');
+
+      // 2. Authenticate with Jupiter Trigger API
+      console.log(`🔑 [EXECUTOR] Authenticating session via challenge-response...`);
+      const jwtToken = await jupiter.getJwtToken(wallet.walletName, wallet.solAddress, passphrase);
+
+      // 3. Ensure Custodial Vault is Provisioned
+      console.log(`🏦 [EXECUTOR] Provisioning/Verifying custodial trading vault...`);
+      const vaultData = await jupiter.getVault(jwtToken);
+      console.log(`✅ [EXECUTOR] Vault verified: ${vaultData.vaultPubkey}`);
+
+      // 4. Fetch Live USD Prices for precise bracketing targets
+      const [priceRes, solRes] = await Promise.all([
+        fetch(`https://data.solanatracker.io/price?token=${token.mint}`, { headers: { 'x-api-key': process.env.SOLANATRACKER_API_KEY } }),
+        fetch(`https://data.solanatracker.io/price?token=So11111111111111111111111111111111111111112`, { headers: { 'x-api-key': process.env.SOLANATRACKER_API_KEY } })
+      ]).catch(() => [null, null]);
+
+      const [priceData, solData] = await Promise.all([
+        priceRes ? priceRes.json() : null,
+        solRes ? solRes.json() : null
+      ]);
+
+      const solPriceUsd = solData?.price || 150;
+      const currentTokenPriceUsd = priceData?.price || 0.0001;
+      
+      // Calculate tactics price brackets in absolute USD
+      const parentTriggerPriceUsd = currentTokenPriceUsd * 0.95; // Trigger buy instantly since current price > 95%
+      const tpPriceUsd = currentTokenPriceUsd * (1 + (settings.tpPercent || 100) / 100);
+      const slPriceUsd = currentTokenPriceUsd * (1 - (settings.slPercent || 50) / 100);
+
+      const SOL_MINT = "So11111111111111111111111111111111111111112";
+      const amountLamports = Math.floor(settings.defaultBuyAmount * 1e9);
+      const slippageBps = settings.slippage && settings.slippage !== 'auto' ? Math.floor(parseFloat(settings.slippage) * 100) : 250;
+
+      // 5. Craft Deposit Transaction
+      console.log(`📦 [EXECUTOR] Crafting Jupiter OTOCO deposit payload...`);
+      const depositCraft = await jupiter.craftDeposit(jwtToken, {
+        inputMint: SOL_MINT,
+        outputMint: token.mint,
+        userAddress: wallet.solAddress,
+        amount: amountLamports,
+        orderSubType: "otoco"
+      });
+
+      // 6. Sign Deposit Transaction natively via OWS injection
+      console.log(`✍️ [EXECUTOR] Signing custodial vault deposit transaction...`);
+      const txBuf = Buffer.from(depositCraft.transaction, "base64");
+      const txHex = txBuf.toString("hex");
+      const signResult = ows.signSolanaTransaction(wallet.walletName, txHex, passphrase);
+      const signatureBytes = Buffer.from(signResult.signature, "hex");
+      signatureBytes.copy(txBuf, 1);
+      const depositSignedTx = txBuf.toString("base64");
+
+      // 7. Submit Bundled OTOCO Order
+      console.log(`🚀 [EXECUTOR] Broadcasting autonomous OTOCO trigger order...`);
+      const orderPayload = {
+        orderType: "otoco",
+        depositRequestId: depositCraft.requestId,
+        depositSignedTx,
+        userPubkey: wallet.solAddress,
+        inputMint: SOL_MINT,
+        inputAmount: amountLamports.toString(),
+        outputMint: token.mint,
+        triggerMint: token.mint,
+        triggerCondition: "above",
+        triggerPriceUsd: Number(parentTriggerPriceUsd.toFixed(6)),
+        tpPriceUsd: Number(tpPriceUsd.toFixed(6)),
+        slPriceUsd: Number(slPriceUsd.toFixed(6)),
+        slippageBps,
+        tpSlippageBps: 250,
+        slSlippageBps: 2000, // 20% stop-loss execution certainty
+        expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000 // 30-day standard expiry
+      };
+
+      const orderRes = await jupiter.createOtocoOrder(jwtToken, orderPayload);
+      const jupiterOrderId = orderRes.order?.id || orderRes.id || depositCraft.requestId;
+      console.log(`✅ [EXECUTOR] Jupiter OTOCO successfully locked! Order ID: ${jupiterOrderId}`);
+
+      // 8. Record the trade securely
+      const actualPriceSol = currentTokenPriceUsd / solPriceUsd;
+      const tradeRecord = await this.recordJupiterTrade(user, token, settings.defaultBuyAmount, actualPriceSol, jupiterOrderId, settings.currentMissionId);
+
+      return {
+        success: true,
+        hash: depositCraft.requestId, // Map request ID as identifier for tracking
+        symbol: token.symbol,
+        amount: settings.defaultBuyAmount,
+        price: actualPriceSol,
+        engine: "jupiter",
+        orderId: jupiterOrderId
+      };
+
+    } catch (error) {
+      console.error(`❌ [EXECUTOR] Execution failed for user ${user.userId}:`, error.message);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Fallback Execution path for Token-2022 assets using legacy Raptor High-Speed logic.
+   */
+  async executeRaptorSnipe(user, token, activeProfile, wallet, settings) {
+    try {
       console.log(`⚙️ [SETTINGS] Buy: ${settings.defaultBuyAmount} SOL | Slippage: ${settings.slippage} | Wallet: ${wallet.solAddress}`);
 
-      // 1. Get Quote and Swap Transaction from Solana Tracker
       const SOL_MINT = "So11111111111111111111111111111111111111112";
       const amountLamports = Math.floor(settings.defaultBuyAmount * 1e9); 
       
@@ -52,14 +188,10 @@ export class TradeExecutor {
         slippage: settings.slippage || 'auto', 
         priorityFee: "veryHigh",
         feeAccount: process.env.TREASURY_ADDRESS,
-        feeBps: 100, // 1% platform fee
-        feeFromInput: true // CRITICAL: Take fee in SOL to avoid ATA reverts
+        feeBps: 100,
+        feeFromInput: true
       });
 
-      // Raptor quote debug log removed
-
-      // 2. Sign and Send via Yellowstone Jet TPU
-      // Compute the deterministic passphrase used by OWS to decrypt the local wallet file
       const serverSecret = process.env.ZERION_API_KEY || 'default_secret';
       const passphrase = crypto.createHmac('sha256', serverSecret).update(user.userId.toString() + wallet.id).digest('hex');
 
@@ -69,7 +201,6 @@ export class TradeExecutor {
         passphrase
       );
 
-      // 3. Confirm Transaction Status On-Chain
       console.log(`⏳ [EXECUTOR] Tx broadcasted (${result.hash}). Verifying on-chain status...`);
       let txConfirmed = false;
       let txStatusData = null;
@@ -85,8 +216,6 @@ export class TradeExecutor {
         } catch (e) {}
       }
 
-      // txStatusData logs removed for cleanliness
-
       if (!txConfirmed) {
         throw new Error("Transaction verification timed out. It may have been dropped.");
       }
@@ -99,7 +228,6 @@ export class TradeExecutor {
 
       console.log(`✅ [TRADE] Confirmed On-Chain! TX: ${result.hash}`);
       
-      // 4. Record trade in DB (Using exact event data)
       const executionData = await this.recordTrade(user, token, raptorResult.quote, result, settings.currentMissionId);
 
       return {
@@ -107,12 +235,11 @@ export class TradeExecutor {
         hash: result.hash,
         symbol: token.symbol,
         amount: settings.defaultBuyAmount,
-        price: executionData.buyPrice
+        price: executionData.buyPrice,
+        engine: "raptor"
       };
-
-    } catch (error) {
-      console.error(`❌ [EXECUTOR] Raptor Snipe failed for user ${user.userId}:`, error.message);
-      return { success: false, error: error.message };
+    } catch (err) {
+      throw err;
     }
   }
 
@@ -123,7 +250,6 @@ export class TradeExecutor {
     try {
       await this.initialize();
       
-      // Use the primary wallet and its secure agent token
       const wallet = user.wallets[0]; 
       const agentToken = wallet.agentToken;
 
@@ -133,7 +259,6 @@ export class TradeExecutor {
 
       console.log(`📉 [EXECUTOR] Starting Raptor SELL for ${user.userId} | Token: ${trade.symbol} | Amount: ${sellPercentage}%`);
 
-      // 1. Get the current balance of the token to sell
       const balance = await this.getTokenBalance(wallet.solAddress, trade.mint);
       if (balance <= 0) {
         console.log(`⚠️ [EXECUTOR] Zero balance for ${trade.symbol}. Marking as closed.`);
@@ -141,7 +266,6 @@ export class TradeExecutor {
         return { success: true };
       }
 
-      // 2. Get Quote and Swap Transaction for SELL (Token -> SOL)
       const SOL_MINT = "So11111111111111111111111111111111111111112";
       
       const tokenInfo = await this.getTokenMetadata(trade.mint);
@@ -163,7 +287,6 @@ export class TradeExecutor {
 
       console.log(`📝 [RAPTOR-QUOTE] Found exit route for ${trade.symbol}. Est. SOL: ${raptorResult.quote.amountOut / 1e9}`);
 
-      // 3. Sign and Send
       const serverSecret = process.env.ZERION_API_KEY || 'default_secret';
       const passphrase = crypto.createHmac('sha256', serverSecret).update(user.userId.toString() + wallet.id).digest('hex');
 
@@ -173,7 +296,6 @@ export class TradeExecutor {
         passphrase
       );
 
-      // 4. Confirm Transaction Status On-Chain
       console.log(`⏳ [EXECUTOR] Sell Tx broadcasted (${result.hash}). Verifying on-chain status...`);
       let txConfirmed = false;
       let txSuccess = false;
@@ -214,7 +336,6 @@ export class TradeExecutor {
 
   async getTokenBalance(address, mint) {
     try {
-      // We can use Zerion for balance checking (it's reliable for indexer data)
       const { getPositions } = await import('../../../cli/utils/api/client.js');
       const response = await getPositions(address, { chainId: 'solana' });
       const match = (response.data || []).find(
@@ -236,7 +357,6 @@ export class TradeExecutor {
         symbol: response.data?.attributes?.symbol || 'TOKEN'
       };
     } catch (error) {
-      // Silence log for unindexed new tokens to avoid spam
       return { decimals: 6, symbol: 'TOKEN' };
     }
   }
@@ -244,7 +364,6 @@ export class TradeExecutor {
   async recordTrade(user, token, quote, result, missionId) {
     const { symbol } = await this.getTokenMetadata(token.mint);
     
-    // 1. Extract exact on-chain data from SwapCompleteEvent
     const swapEvent = result.events?.find(e => e.name === 'SwapCompleteEvent')?.parsed;
     
     const decimals = swapEvent ? swapEvent.outputDecimals : 6;
@@ -262,17 +381,47 @@ export class TradeExecutor {
       decimals: decimals, 
       buyAmount: spentAmountSOL, 
       buyPrice: actualPrice,
-      entryMarketCap: actualPrice * 1000000000, // Always use 1B Supply logic for Initial MCap
+      entryMarketCap: actualPrice * 1000000000,
       receivedAmount: receivedAmount,
       txHash: result.hash,
       timestamp: new Date(),
       status: 'open',
       pnl: 0,
-      isAutoExit: true
+      isAutoExit: true,
+      engine: 'raptor'
     };
 
     await this.db.collection('trades').insertOne(trade);
     console.log(`📝 [EXECUTOR] Trade recorded for ${symbol} | Price: ${actualPrice.toFixed(10)} | MCap: ${(actualPrice * 1e9).toFixed(0)}`);
+    
+    return trade;
+  }
+
+  async recordJupiterTrade(user, token, spentAmountSOL, actualPriceSol, jupiterOrderId, missionId) {
+    const { symbol, decimals } = await this.getTokenMetadata(token.mint);
+    const receivedAmount = spentAmountSOL / actualPriceSol;
+
+    const trade = {
+      userId: user.userId,
+      missionId,
+      mint: token.mint,
+      symbol: symbol,
+      decimals: decimals, 
+      buyAmount: spentAmountSOL, 
+      buyPrice: actualPriceSol,
+      entryMarketCap: actualPriceSol * 1000000000,
+      receivedAmount: receivedAmount,
+      txHash: jupiterOrderId, // Track request ID as virtual hash
+      jupiterOrderId: jupiterOrderId,
+      timestamp: new Date(),
+      status: 'open',
+      pnl: 0,
+      isAutoExit: true,
+      engine: 'jupiter'
+    };
+
+    await this.db.collection('trades').insertOne(trade);
+    console.log(`📝 [EXECUTOR] Jupiter Trade recorded for ${symbol} | Order ID: ${jupiterOrderId}`);
     
     return trade;
   }
@@ -293,7 +442,6 @@ export class TradeExecutor {
     const profitPerToken = sellPrice - avgEntryPrice;
     const realizedProfitSOL = tokensToSell * profitPerToken;
 
-    // Proportionally reduce each open trade
     for (const trade of trades) {
       const tradeReductionFactor = percentage / 100;
       const soldFromThisTrade = trade.receivedAmount * tradeReductionFactor;
@@ -303,7 +451,6 @@ export class TradeExecutor {
       const newBuyAmount = trade.buyAmount - solBasisFromThisTrade;
 
       if (newReceivedAmount < 0.000001 || percentage === 100) {
-        // Close the trade entirely
         await this.db.collection('trades').updateOne(
           { _id: trade._id },
           { 
@@ -318,7 +465,6 @@ export class TradeExecutor {
           }
         );
       } else {
-        // Partial reduction
         await this.db.collection('trades').updateOne(
           { _id: trade._id },
           { 
