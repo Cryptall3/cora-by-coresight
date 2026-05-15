@@ -110,7 +110,9 @@ export class TradeExecutor {
         slippageBps,
         tpSlippageBps: 250,
         slSlippageBps: 2000,
-        expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000 // 30-day standard expiry
+        expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000, // 30-day standard expiry
+        referralAccount: process.env.JUPITER_REFERRAL_ACCOUNT,
+        referralFeeBps: 100
       };
 
       const orderRes = await jupiter.createOtocoOrder(jwtToken, orderPayload);
@@ -159,7 +161,7 @@ export class TradeExecutor {
       const rawAmount = Math.floor(amountToSell * Math.pow(10, tokenInfo.decimals || 6));
       
       // 1. Get Quote and Transaction from Jupiter Swap API V2
-      const orderRes = await fetch(`https://api.jup.ag/swap/v2/order?inputMint=${trade.mint}&outputMint=${SOL_MINT}&amount=${rawAmount}&taker=${wallet.solAddress}`);
+      const orderRes = await fetch(`https://api.jup.ag/swap/v2/order?inputMint=${trade.mint}&outputMint=${SOL_MINT}&amount=${rawAmount}&taker=${wallet.solAddress}&referralAccount=${process.env.JUPITER_REFERRAL_ACCOUNT}&referralFee=100`);
       if (!orderRes.ok) throw new Error(`Jupiter Swap Quote failed: ${await orderRes.text()}`);
       
       const orderData = await orderRes.json();
