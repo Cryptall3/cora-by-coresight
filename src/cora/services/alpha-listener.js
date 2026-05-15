@@ -151,18 +151,34 @@ ${footerStr}
         console.error(`⚠️ [SNIPE-FAIL] User ${user.userId} failed: ${result.error}`);
         
         if (this.bot) {
-          const reason = result.error.includes('insufficient') ? 'Insufficient SOL balance' : result.error;
+          let reason = result.error;
+          let action = 'Please check your wallet and settings.';
+          let title = 'Alpha Sniper: Buy Failed';
+
+          if (result.error.includes('10 USD')) {
+            title = '⚠️ Alpha Sniper: Amount Too Small';
+            reason = 'Jupiter autonomous triggers require a minimum trade of <b>$10 USD</b>.';
+            action = 'Please increase your <b>Buy Amount</b> in Settings to enable automated execution.';
+          } else if (result.error.includes('insufficient')) {
+            title = '⚠️ Alpha Sniper: Insufficient Funds';
+            reason = 'Your wallet does not have enough SOL to cover the buy and gas fees.';
+            action = `Please fund your primary wallet with at least <b>${(user.settings.defaultBuyAmount + 0.005).toFixed(3)} SOL</b>.`;
+          }
+
           const msg = `
-⚠️ **Alpha Sniper: Buy Failed**
+<b>${title}</b>
 
-**Token:** $${token.symbol}
-**Address:** \`${token.mint}\`
-**Reason:** ${reason}
+<b>Token:</b> $${token.symbol}
+<b>Address:</b> <code>${token.mint}</code>
 
-_Required: \`${(user.settings.defaultBuyAmount + 0.005).toFixed(3)} SOL\` (inc. gas)_
-_Please fund your primary wallet to resume sniping._
+<b>Issue:</b> ${reason}
+
+<i>${action}</i>
           `;
-          await this.bot.telegram.sendMessage(user.userId, msg, { parse_mode: 'Markdown' }).catch(() => {});
+          await this.bot.telegram.sendMessage(user.userId, msg, { 
+            parse_mode: 'HTML',
+            disable_web_page_preview: true
+          }).catch(() => {});
         }
       }
     } catch (error) {
