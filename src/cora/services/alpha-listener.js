@@ -129,9 +129,7 @@ export class AlphaListener {
 
           const tpPct = user.settings?.tpPercent || 100;
           const slPct = user.settings?.slPercent || 50;
-          const footerStr = result.engine === 'jupiter'
-            ? `⚡️ <b>Jupiter Trigger Activated:</b> Fully automated on-chain OTOCO limits locked at <b>+${tpPct}% TP</b> and <b>-${slPct}% SL</b>.`
-            : `<i>Cora is now monitoring this position for Take Profit (+${tpPct}%) and Stop Loss (-${slPct}%).</i>`;
+          const footerStr = `⚡️ <b>Jupiter Trigger Activated:</b> Fully automated on-chain OTOCO limits locked at <b>+${tpPct}% TP</b> and <b>-${slPct}% SL</b>.`;
 
           const msg = `
 🚀 <b>Alpha Sniper: Position Opened!</b>
