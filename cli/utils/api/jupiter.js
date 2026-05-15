@@ -32,74 +32,101 @@ function bufferToBase58(buffer) {
   return output.reverse().join("");
 }
 
-let _cachedJwt = null;
-let _jwtExpiresAt = 0;
+// Per-wallet authentication state to support high-concurrency multi-user scaling
+const _walletAuthState = new Map();
 
 /**
  * Authenticate with Jupiter using Challenge-Response flow.
- * Caches the JWT token in-memory for 23 hours.
+ * Caches the JWT token in-memory for 23 hours per wallet.
  */
 export async function getJwtToken(walletName, walletAddress, passphrase) {
-  const apiKey = process.env.JUPITER_API_KEY;
-  if (!apiKey) {
-    throw new Error("JUPITER_API_KEY is missing from environment variables.");
+  // Initialize state for this specific wallet if it doesn't exist
+  if (!_walletAuthState.has(walletAddress)) {
+    _walletAuthState.set(walletAddress, {
+      token: null,
+      expiresAt: 0,
+      promise: null
+    });
   }
 
-  if (_cachedJwt && Date.now() < _jwtExpiresAt) {
-    return _cachedJwt;
+  const state = _walletAuthState.get(walletAddress);
+
+  // 1. Check if we have a valid cached token for this wallet
+  if (state.token && Date.now() < state.expiresAt) {
+    return state.token;
   }
 
-  // 1. Request challenge
-  const challengeRes = await fetch(`${BASE_URL}/auth/challenge`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": apiKey,
-    },
-    body: JSON.stringify({
-      walletPubkey: walletAddress,
-      type: "message",
-    }),
-  });
-
-  if (!challengeRes.ok) {
-    const errText = await challengeRes.text();
-    throw new Error(`Jupiter Auth Challenge failed: ${challengeRes.status} - ${errText}`);
+  // 2. If this wallet is already in the middle of authenticating, wait for that specific promise
+  if (state.promise) {
+    return state.promise;
   }
 
-  const challengeData = await challengeRes.json();
+  // 3. Start new authentication flow for this specific wallet
+  state.promise = (async () => {
+    try {
+      const apiKey = process.env.JUPITER_API_KEY;
+      if (!apiKey) {
+        throw new Error("JUPITER_API_KEY is missing from environment variables.");
+      }
 
-  // 2. Sign challenge message using OWS
-  // ows.signMessage returns an object containing the hex signature
-  const signResult = ows.signMessage(walletName, challengeData.challenge, passphrase, "utf8", "solana");
-  const signatureBuffer = Buffer.from(signResult.signature, "hex");
-  const base58Signature = bufferToBase58(signatureBuffer);
+      // 1. Request challenge
+      const challengeRes = await fetch(`${BASE_URL}/auth/challenge`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+        },
+        body: JSON.stringify({
+          walletPubkey: walletAddress,
+          type: "message",
+        }),
+      });
 
-  // 3. Verify signature and get JWT
-  const verifyRes = await fetch(`${BASE_URL}/auth/verify`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": apiKey,
-    },
-    body: JSON.stringify({
-      type: "message",
-      walletPubkey: walletAddress,
-      signature: base58Signature,
-    }),
-  });
+      if (!challengeRes.ok) {
+        const errText = await challengeRes.text();
+        throw new Error(`Jupiter Auth Challenge failed: ${challengeRes.status} - ${errText}`);
+      }
 
-  if (!verifyRes.ok) {
-    const errText = await verifyRes.text();
-    throw new Error(`Jupiter Auth Verify failed: ${verifyRes.status} - ${errText}`);
-  }
+      const challengeData = await challengeRes.json();
 
-  const { token } = await verifyRes.json();
-  _cachedJwt = token;
-  // Set cache expiry to 23 hours (JWT TTL is 24h)
-  _jwtExpiresAt = Date.now() + 23 * 60 * 60 * 1000;
+      // 2. Sign challenge message using OWS
+      const signResult = ows.signMessage(walletName, challengeData.challenge, passphrase, "utf8", "solana");
+      const signatureBuffer = Buffer.from(signResult.signature, "hex");
+      const base58Signature = bufferToBase58(signatureBuffer);
 
-  return token;
+      // 3. Verify signature and get JWT
+      const verifyRes = await fetch(`${BASE_URL}/auth/verify`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+        },
+        body: JSON.stringify({
+          type: "message",
+          walletPubkey: walletAddress,
+          signature: base58Signature,
+        }),
+      });
+
+      if (!verifyRes.ok) {
+        const errText = await verifyRes.text();
+        throw new Error(`Jupiter Auth Verify failed: ${verifyRes.status} - ${errText}`);
+      }
+
+      const { token } = await verifyRes.json();
+      
+      // Update state for this wallet
+      state.token = token;
+      state.expiresAt = Date.now() + 23 * 60 * 60 * 1000;
+      
+      return token;
+    } finally {
+      // Clear the promise so the wallet can re-auth after 23 hours
+      state.promise = null;
+    }
+  })();
+
+  return state.promise;
 }
 
 /**
